@@ -96,13 +96,21 @@ Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik 
     > - **VMware ESXi/Workstation:** `00:50:56:xx:xx:xx` veya `00:0c:29:xx:xx:xx`
     > - **Oracle VirtualBox:** `08:00:27:xx:xx:xx`
 
-  * **DHCP Rezervasyonu Nasıl Güvenceye Alınır? (Mantık Zinciri):**
-    1. **Sabit Sanal Donanım:** Yukarıdaki XML yapılandırmasıyla sanal sunucunun MAC adresi `52:54:00:1a:2b:3c` olarak sabitlenir (VM silinip yeniden deploy edilse dahi bu XML şablonu aynı MAC'i verir).
-    2. **DHCP Sunucusu Eşleştirmesi (Static Lease / Host Reservation):** Ağdaki DHCP sunucusunda (örneğin Router, Pfsense veya `dnsmasq`) şu kural tanımlanır:
+  * **MAC Adresi ile DHCP Rezervasyonu Nasıl Güvenceye Alınır? (Sıfırdan Mantık Zinciri):**
+    > ℹ️ *Ön Bilgi: Ağlarda cihazlara otomatik IP adresi dağıtan merkezi bir yazılım/cihaz bulunur (Buna **DHCP Sunucusu** denir; evlerde bu görevi modem yapar. Detayları [Modül 2 / Madde 6'da](#6-dhcp-dynamic-host-configuration-protocol) göreceğiz).*
+
+    1. **Sanal Makine Açılır ve İstek Gönderir:**  
+       Yeni kurulan sanal makine ilk kez açıldığında henüz bir IP adresine sahip değildir. Ancak yukarıdaki XML tanımı sayesinde **`52:54:00:1a:2b:3c` şeklinde sabit bir donanım (MAC) kimliği** vardır. Sanal makine ağa bir paket fırlatır:  
+       > *"Ben `52:54:00:1a:2b:3c` MAC adresine sahip bir makineyim, ağda iletişim kurabilmem için bana bir IP adresi verin!"*
+    
+    2. **DHCP Sunucusu İsteği Yakalar ve Eşleştirir:**  
+       Ağdaki modem/DHCP sunucusu bu çağrıyı duyar. Normal şartlarda DHCP sunucusu boşta duran rastgele bir IP atar (ve bu IP ileride değişebilir). Ancak bir sunucunun IP'sinin sürekli değişmesi felakettir. Bu yüzden ağ yöneticisi DHCP sunucusunun yönetim paneline önceden şu kuralı yazar (**Rezervasyon / Static Lease**):  
        ```text
-       Eğer gelen istek MAC: 52:54:00:1a:2b:3c ise -> Her zaman 192.168.1.100 IP'sini ata.
+       Kural: "Eğer IP isteyen cihazın MAC adresi 52:54:00:1a:2b:3c ise -> Rastgele IP verme, HER ZAMAN 192.168.1.100 IP'sini teslim et!"
        ```
-    3. **Avantajı:** Sanal makinenin içine girip işletim sisteminde tek tek statik IP (`netplan`, `ifcfg` vb.) tanımlamaya gerek kalmaz. Makine formatlansa veya yeniden kurulsa dahi, açılır açılmaz DHCP'den aynı rezerve IP'yi çeker. Böylece veritabanı veya web sunucusu IP adresini asla kaybetmez; DNS ve Firewall kuralları kesintiye uğramaz.
+    
+    3. **Büyük Avantajı:**  
+       Sanal sunucunun işletim sistemi içine girip elle statik IP yapılandırması (`netplan`, `ifcfg` vb.) yapmakla uğraşmazsınız. Sanal makineyi silseniz, formatlasanız veya yeniden kursanız dahi; XML şablonunda MAC adresi sabit olduğu sürece açılır açılmaz DHCP'den aynı rezerve IP'yi (`192.168.1.100`) çeker. Böylece web veya veritabanı sunucunuzun IP'si hiçbir zaman kaybolmaz; güvenlik duvarı ve alan adı yönlendirmeleriniz asla bozulmaz.
 * **Gündelik Hayatta Karşılığı:**  
   > 💡 **Analoji:** Bir insanın **T.C. Kimlik Numarası** gibidir; kişi nereye taşınırsa taşınsın bu kimlik sabittir. Evdeki Wi-Fi modeminizde *"MAC Filtreleme"* açarak sadece evdeki cihazların MAC adreslerine izin vermek ve komşunuz şifreyi bilse dahi ağa girmesini engellemek en tipik örneğidir.
 * **Alternatif Kullanım Amaçları ve Örnekleri:**
@@ -115,6 +123,9 @@ Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik 
 
 * **Nedir:** Cihazların ağlar üzerinde mantıksal olarak konumlanmasını sağlayan, yönlendirilebilir 32-bit (IPv4) veya 128-bit (IPv6) adresleme protokolüdür.
 * **Kullanım Amacı:** OSI 3. Katmanda (Network) paketlerin farklı yerel ağlar ve internet omurgası üzerinden hedefe yönlendirilmesini (Routing) sağlar.
+* **IPv4 vs IPv6 (Neden Yeni Protokole Geçiyoruz?):**
+  * **IPv4 (32-bit):** Yaklaşık $2^{32} \approx 4.3$ milyar adres üretir. 2010'lu yıllarda küresel olarak tükenmiştir; bu nedenle NAT (Network Address Translation) gibi geçici yamalara muhtaç kalınmıştır.
+  * **IPv6 (128-bit):** Yaklaşık $2^{128} \approx 3.4 \times 10^{38}$ (trilyonlarca trilyon) adres üretir. Dünyadaki her kum tanesine binlerce IP verilebilecek büyüklüktedir. NAT zorunluluğunu ortadan kaldırır, her cihaz doğrudan genel internette uçtan uca (End-to-End) benzersiz bir IP alır; dahili IPSec desteği ve otomatik yapılandırma (SLAAC) sunar.
 * **Temel IP Blokları ve Sınıflandırma:**
   * **Public IP (Genel):** İnternette yönlendirilebilen, ICANN/RIPE tarafından ISP'lere ve kuruluşlara tahsis edilen küresel IP'lerdir.
   * **Private IP (Özel - RFC 1918):** İnternete doğrudan çıkamayan, yerel ağlara ayrılmış bloklardır:
@@ -122,7 +133,7 @@ Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik 
     * `172.16.0.0/12` (Orta ölçekli ağlar / Docker container ağları)
     * `192.168.0.0/16` (Ev ve küçük ofis ağları)
   * **Loopback IP (`127.0.0.1` / `::1`):** Cihazın kendi yerel TCP/IP yığınını test eden ve dışarıya paket çıkarmadan yerel servislere bağlanmayı sağlayan adrestir.
-  * **APIPA (`169.254.0.0/16`):** DHCP sunucusundan yanıt alınamadığında işletim sisteminin cihaza otomatik atadığı geçici yerel iletişim bloğudur.
+  * **APIPA (`169.254.0.0/16`):** DHCP sunucusundan yanıt alınamadığında işletim sisteminin cihaza otomatik atadığı geçici yerel iletişim bloğudur. Bu IP'yi gören bir kullanıcı hemen *"Ağda DHCP sunucusuna ulaşılamıyor"* teşhisini koymalıdır.
 * **Gündelik Hayatta Karşılığı:**  
   > 💡 **Analoji:** MAC kimlik kartıysa, IP adresi **evinizin posta adresidir**. Şehir veya sokak değiştirdiğinizde (başka kafeye veya ağa bağlandığınızda) posta adresiniz değişir. Evdeki akıllı ampulün telefon uygulaması üzerinden açılıp kapanması yerel IP (`192.168.1.45`) üzerinden yürür.
 * **Alternatif Kullanım Amaçları ve Örnekleri:**
@@ -184,6 +195,9 @@ Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik 
 
 * **Nedir:** Yerel alt ağ (Subnet) dışındaki hedeflere (örneğin internete veya farklı bir VLAN'a) gidecek tüm paketlerin teslim edildiği yönlendiricinin (Router) yerel IP adresidir.
 * **Kullanım Amacı:** Yönlendirme tablosunda (Routing Table) özel bir rota kuralı bulunmayan trafiğin (`0.0.0.0/0`) dış dünyaya ulaştırılması.
+* **Gateway Yanlış veya Eksik Olursa Ne Olur? (Kritik Sorun Teşhisi):**
+  * Yerel ağdaki diğer cihazlarla iletişim **kesintisiz devam eder**. Örneğin同一 `192.168.1.0/24` ağındaki komşu bilgisayara ping atabilir veya yerel ağdaki yazıcıdan çıktı alabilirsiniz; çünkü bu iletişim router'a uğramadan Katman 2'de (Switch üzerinde MAC tablosuyla) gerçekleşir.
+  * Ancak internete veya başka bir alt ağa erişmeye çalıştığınız anda işletim sistemi paketi nereye teslim edeceğini bilemez ve `Network is unreachable` (Ağa ulaşılamıyor) hatası verir.
 * **Ayar & Parametre:**
   ```bash
   # Linux varsayılan ağ geçidi ekleme ve kontrol
@@ -205,6 +219,10 @@ Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik 
 
 * **Nedir:** 32-bit mantıksal IPv4 adresini, yerel ağda karşılığı olan 48-bit fiziksel MAC adresine dönüştüren 2. ile 3. katman arasındaki köprü protokoldür.
 * **Kullanım Amacı:** Aynı yerel ağdaki bir hedefe paket gönderilirken Ethernet çerçeve başlığına hedef MAC adresinin yazılması gerekir. ARP, bu adresin dinamik olarak öğrenilmesini sağlar.
+* **Hedef Aynı Ağda mı, Dışarıda mı? (ARP Karar Mekanizması):**  
+  Bilgisayar bir paketi kabloya basmadan önce hedef IP ile kendi Subnet Mask'ını mantıksal `AND` işlemine tabi tutar:
+  * **Hedef Yerel Ağdaysa:** Bilgisayar doğrudan hedef makinenin IP'si için ARP sorgusu atar (`Who has 192.168.1.50? Tell 192.168.1.10`).
+  * **Hedef İnternette / Farklı Ağdaysa (Örn: `google.com` - `142.250.184.206`):** Bilgisayar asla Google'ın MAC adresini sormaz (çünkü Google başka bir ağdadır ve switch broadcast sınırını aşamaz). Paket IP katmanında Google adresini korurken, Ethernet çerçevesine **Default Gateway'in (Router) MAC adresi** yazılır. Dolayısıyla ARP sorgusu Google için değil, **Gateway IP'si (`192.168.1.1`) için** atılır! Paketi teslim alan Router, paketi internet omurgasına yönlendirir.
 * **Ayar & İnceleme:**
   ```bash
   # ARP tablosunu inceleme ve statik kayıt ekleme
@@ -267,6 +285,15 @@ Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik 
   | **TXT** | Güvenlik ve doğrulama metinleri içerir | `v=spf1 include:_spf.google.com ~all` |
   | **NS** | O bölgeden sorumlu yetkili DNS sunucularını belirtir | `ns1.cloudflare.com` |
   | **SOA** | Bölgenin seri numarası, yenileme ve TTL temel kurallarını tutar | Master DNS yetki kaydı |
+* **DNS Sorgusu Sırasıyla Nereye Gider? (Hiyerarşik Çözümleme Adımları):**
+  Bir tarayıcıya `www.google.com` yazıp Enter'a bastığınızda sırasıyla şu zincir işletilir:
+  1. **Tarayıcı Önbelleği (Browser Cache):** Tarayıcı yakın zamanda bu adrese gitti mi? (Evetse anında IP döner).
+  2. **İşletim Sistemi Önbelleği & `hosts` Dosyası:** Bilgisayarın yerel DNS hafızası ve statik `hosts` dosyası kontrol edilir.
+  3. **Recursive DNS Çözücüsü (Özyinelemeli Sunucu):** Ev modemi, ISP DNS'i veya genel çözücüler (`1.1.1.1`, `8.8.8.8`). Cevap önbellekte yoksa kök sunuculara doğru sorgulama maratonunu başlatır:
+     * **Kök DNS (Root Server - `.`):** Sorguyu `.com` TLD sunucusuna paslar.
+     * **TLD Sunucusu (`.com`):** Sorguyu alan adının yetkili sunucusuna (`ns1.google.com`) paslar.
+     * **Yetkili DNS (Authoritative Server):** Domain'in gerçek sahibi olan sunucudur; IP adresini (`142.250.184.206`) Recursive sunucuya iletir.
+  4. **Önbellekleme & TTL (Time-to-Live):** Recursive çözücü bu IP'yi kayıtlı TTL süresince saklar ve istemciye teslim eder; sonraki kullanıcılar için sorgu anında cevaplanır.
 * **Gündelik Hayatta Karşılığı:**  
   > 💡 **Analoji:** Telefonunuzdaki **rehber uygulamasıdır**. Arkadaşınızı ararken onun 11 haneli numarasını ezberlemezsiniz; listeden ismini seçersiniz, telefon arka planda numarayı çevirir.
 * **Alternatif Kullanım Amaçları ve Örnekleri:**
@@ -340,6 +367,14 @@ graph TD
   * **SNAT (Source NAT):** İç ağdan dışarıya giden paketlerin yerel kaynak IP'si, yönlendiricinin genel (Public) IP'si ile değiştirilir.
   * **PAT (Port Address Translation / NAT Overload):** Yüzlerce cihazın tek bir Public IP üzerinden farklı rastgele istemci portları açılarak internete çıkarılmasıdır (Ev modemlerindeki standart çalışma biçimi).
   * **DNAT (Destination NAT / Port Forwarding):** Dış dünyadan yönlendiricinin Public IP'sine ve belirli bir portuna gelen isteğin, iç ağdaki belirli bir yerel sunucuya (`192.168.1.100:80`) yönlendirilmesidir.
+* **PAT Çeviri Tablosu Nasıl Çalışır? (Dönüş Paketini Modem Kime Vereceğini Nereden Bilir?):**
+  Evdeki iki telefon aynı anda Google'a bağlandığında modem ikisini de tek Public IP'si (`88.240.12.5`) arkasından çıkarır:
+  ```text
+  [İç Cihaz Soketi]        ──► [Modem NAT Tablosu (Dışarı Çıkış)] ──► [Hedef Web Sunucu]
+  192.168.1.15:52110       ──► 88.240.12.5:41001                 ──► 142.250.184.206:443
+  192.168.1.20:53400       ──► 88.240.12.5:41002                 ──► 142.250.184.206:443
+  ```
+  Google sunucusu cevabı modemin `41002` nolu portuna döndüğünde, modem hafızasındaki tabloya bakar: *"41002 portu içerideki `192.168.1.20:53400` cihazına aitti"* der ve paketi doğrudan o telefona teslim eder. Paketler asla birbirine karışmaz.
 * **Gündelik Hayatta Karşılığı:**  
   > 💡 **Analoji:** Bir şirketin santral numarası gibidir. 500 çalışanın dışarıya doğru aramalarında karşı taraf sadece şirketin ana santral numarasını görür (**SNAT/PAT**). Müşteri şirketi arayıp *"Dahili 105'i bağlayın"* dediğinde ise santral çağrıyı ilgili personelin masasına aktarır (**Port Forwarding / DNAT**).
 * **Alternatif Kullanım Amaçları ve Örnekleri:**
@@ -355,6 +390,11 @@ graph TD
   * **VLAN ID:** 12-bitlik değer (`1 - 4094` arası).
   * **Access Port:** Yalnızca tek bir VLAN'a ait olan ve uç cihazlara (PC, yazıcı) giden etiketlenmemiş (untagged) port.
   * **Trunk Port:** Birden fazla VLAN'a ait paketleri üzerinde **IEEE 802.1Q** standardı etiketleriyle (VLAN Tag) taşıyan omurga port (Switch-Switch veya Switch-Router arası).
+* **Paket Yaşam Döngüsü (Etiket Nerede Takılır, Nerede Sökülür?):**
+  1. Standart bilgisayarlar veya yazıcılar VLAN etiketini (802.1Q başlığını) tanımaz. PC switch'e normal (etiketsiz) paket gönderir.
+  2. Switch paketi **Access Port** üzerinden kabul ettiği anda pakete o portun VLAN numarasını (örn: `VLAN 10`) yapıştırır (*Tagging*).
+  3. Paket başka bir switch'e veya router'a giderken **Trunk Port** üzerinden bu etiketle taşınır.
+  4. Hedef bilgisayarın bağlı olduğu switch, paketi karşı taraftaki **Access Port**'tan çıkarmadan hemen önce üzerindeki etiketi söker (*Untag*) ve bilgisayara standart Ethernet paketi olarak teslim eder.
 * **Gündelik Hayatta Karşılığı:**  
   > 💡 **Analoji:** Bir plazadaki **tek bir asansör kabininin** hem normal çalışanlar hem de kartını okutan VIP yöneticiler tarafından kullanılmasıdır. Aynı fiziksel ray kullanılır ancak çalışanlar VIP kata basamaz veya o kattaki odalara erişemez.
 * **Alternatif Kullanım Amaçları ve Örnekleri:**
@@ -392,6 +432,9 @@ graph TD
 * **Temel Türleri ve Protokoller:**
   * **Remote Access VPN:** Bireysel kullanıcıların şirket ağına bağlanması (WireGuard, OpenVPN, Cisco AnyConnect).
   * **Site-to-Site VPN:** İki farklı lokasyondaki ofisin router'ları arasında kalıcı tünel açılması (IPsec IKEv2).
+* **Full Tunnel vs Split Tunnel (Kritik Mimari Ayrımı):**
+  * **Full Tunnel (Tam Tünel):** Cihazın ürettiği **tüm internet trafiği** (YouTube, haber siteleri dahil) VPN tüneli üzerinden şirket merkezine akar. Güvenlik en üst seviyedir (şirket tüm trafiği denetler) ancak şirketin internet bant genişliğini tüketir ve kullanıcının kişisel internet hızını yavaşlatabilir.
+  * **Split Tunnel (Ayrık Tünel):** Yalnızca şirket içi IP bloklarına (`10.0.0.0/8`, `192.168.50.0/24`) giden istekler şifreli tünelden geçer. Kullanıcının normal internet aramaları, müzik ve video akışları kullanıcının kendi yerel internetinden doğrudan çıkar. Hızlıdır ve bant genişliğini korur.
 * **Gündelik Hayatta Karşılığı:**  
   > 💡 **Analoji:** Kalabalık bir caddenin altından iki bina arasına kazılmış **özel, kilitli ve zırhlı bir yer altı geçididir**. Dışarıdakiler içeriden ne taşındığını göremez; tüneli kullananlar caddedeki tehlikelerden etkilenmeden hedefe varır.
 * **Alternatif Kullanım Amaçları ve Örnekleri:**
