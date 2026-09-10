@@ -227,6 +227,101 @@ Bir fabrikada veya okulda 500 bilgisayar olduğunu hayal edin:
 
 ---
 
+#### 🧮 Adım Adım Alt Ağlara Bölme (Subnetting Pratiği): `/30` Nasıl Hesaplanır?
+
+Subnetting konusunun kafada tam oturması için işin arkasındaki **ikilik (binary) bit mantığını**, **kutu sistemini** ve **sayıların nereden geldiğini** adım adım açalım:
+
+---
+
+##### 1. Adım: "30 Bit Kilitli, 2 Bit Serbest" Ne Demektir?
+Bir IPv4 adresi toplam **32 bittir** (sekizerli 4 grup: $8 + 8 + 8 + 8 = 32$).  
+Siz `/30` dediğinizde işletim sistemine şu emri verirsiniz:
+> *"Baştan ilk 30 biti Mahalle Adı olarak kilitle, geriye kalan son **2 biti** cihaz numaraları için serbest bırak!"* ($32 - 30 = \mathbf{2\text{ bit}}$)
+
+**Peki 2 bit ile kaç farklı sayı yazabilirsiniz?**  
+İkilik sistemde 2 bitin alabileceği tüm ihtimaller sadece 4 tanedir:
+* `0 0` $\implies \mathbf{0}$
+* `0 1` $\implies \mathbf{1}$
+* `1 0` $\implies \mathbf{2}$
+* `1 1` $\implies \mathbf{3}$
+
+Gördüğünüz gibi, formülün adım adım hesabı şudur:
+$$\text{Serbest Kalan Bit} = 32 - 30 = \mathbf{2\text{ bit}}$$
+$$\text{Toplam Üretilen IP} = 2^2 = \mathbf{4\text{ adet IP}}$$
+
+Yani 2 bit ile dünyadaki hiçbir bilgisayar **4'ten fazla farklı sayı üretemez** ($2^2 = 4$). İşte bu yüzden bir `/30` alt ağı **istisnasız her zaman tam 4 adet IP'den** oluşur!
+
+---
+
+##### 2. Adım: Bu 4 Adet IP Nasıl Paylaşılır? (Kutu Mantığı)
+Ağ kuralı gereği her grubun en başındaki ve en sonundaki IP'ler bilgisayarlara verilemez:
+* **0 (İlk Adres):** Mahallenin tabelasıdır (**Network Adresi**). Cihaza verilemez.
+* **1 (İkinci Adres):** **Router A**'ya verilir (Kullanılabilir IP).
+* **2 (Üçüncü Adres):** **Router B**'ye verilir (Kullanılabilir IP).
+* **3 (Son Adres):** Mahallenin megafonudur (**Broadcast Adresi**). Cihaza verilemez.
+
+Sonuç: 4 IP'den 2 tanesi kural gereği düştü, geriye tam **2 adet kullanılabilir IP** kaldı!
+
+---
+
+##### 3. Adım: 256'lık Büyük Havuz Nasıl Dilimlenir? (Kutuları Sırayla Doldurma)
+
+> ❓ **"Elimizde 256 IP Nasıl Var? Bunu İnternet Sağlayıcısı mı Veriyor, Tek Modemimiz Olduğu İçin mi?"**  
+> * **Dış Dünya (İnternet Sağlayıcınız - ISP):** Türk Telekom / Turkcell gibi sağlayıcılar evinize veya şirketinize genellikle **tek bir adet Genel (Public) IP** verir. İnternet sağlayıcısı size 256 tane IP vermez!  
+> * **İç Dünya (Tek Ana Modeminiz / Router'ınız):** Ancak modeminizin arka tarafı (yani evinizin/şirketinizin içi) tamamen sizin **özel mülkünüzdür**. Standart bir modem veya ana router, iç ağında (LAN) cihazları konuşturmak için varsayılan olarak `/24` (`255.255.255.0`) maskesiyle çalışır. Son kısım 8 bit serbest olduğu için ($2^8 = 256$), modeminiz tek başına kendi iç ağında **tam 256 adet yerel IP'lik (`192.168.1.0` - `192.168.1.255`) özel bir havuz** kurmuş olur.
+> * **Şirketteki Durum:** Şirketin ağ yöneticisi, ana router'ın ürettiği bu 256 kişilik yerel havuzun tamamını tek bir odaya harcamak yerine; *"Bunu 4'erli küçük kutulara böleyim de router'larım arasındaki kablolara paylaştırayım"* der.
+
+İşte bu 256'lık yerel havuzu dörderli kutulara bölerek sırayla sayıyoruz:
+
+* **1. Kutu (0'dan başlar, 4 sayı alır $\rightarrow$ 0, 1, 2, 3):**
+  * Tabela (Network): `192.168.1.0`
+  * Router A: `192.168.1.1`
+  * Router B: `192.168.1.2`
+  * Megafon (Broadcast): `192.168.1.3`
+
+* **2. Kutu (Sıradaki sayı 4'tür, 4 sayı alır $\rightarrow$ 4, 5, 6, 7):**
+  * Tabela (Network): `192.168.1.4`
+  * Router C: `192.168.1.5`
+  * Router D: `192.168.1.6`
+  * Megafon (Broadcast): `192.168.1.7`
+
+* **3. Kutu (Sıradaki sayı 8'dir, 4 sayı alır $\rightarrow$ 8, 9, 10, 11):**
+  * Tabela (Network): `192.168.1.8`
+  * Router E: `192.168.1.9`
+  * Router F: `192.168.1.10`
+  * Megafon (Broadcast): `192.168.1.11`
+
+* **Kaç Kutu Çıkar?**  
+  256 sayısını 4'erli kutulara bölerseniz: $\frac{256}{4} = \mathbf{64\text{ adet}}$ bağımsız alt ağ elde edersiniz. Son kutu `192.168.1.252 - 192.168.1.255` arasında biter.
+
+---
+
+##### 4. Adım: `255.255.255.252` Nereden Geldi? (Bit Tartısı)
+Bilgisayarda 8 bitlik bir grubun her basamağının sabit bir sayısal değeri (ağırlığı) vardır:
+| Bit Pozisyonu | 1. Bit | 2. Bit | 3. Bit | 4. Bit | 5. Bit | 6. Bit | 7. Bit | 8. Bit |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Bit Değeri** | **128** | **64** | **32** | **16** | **8** | **4** | **2** | **1** |
+
+Biz `/30` maskesinde tam **30 tane `1`** yazarız:
+* 1. Sekizli: 8 tane `1` $\rightarrow 128+64+32+16+8+4+2+1 = \mathbf{255}$
+* 2. Sekizli: 8 tane `1` $\rightarrow 128+64+32+16+8+4+2+1 = \mathbf{255}$
+* 3. Sekizli: 8 tane `1` $\rightarrow 128+64+32+16+8+4+2+1 = \mathbf{255}$
+* 4. Sekizli (Kritik Yer): Baştan 6 tane `1`, son 2 tane `0`:
+  $$\mathbf{1}\quad\mathbf{1}\quad\mathbf{1}\quad\mathbf{1}\quad\mathbf{1}\quad\mathbf{1}\quad\mathbf{0}\quad\mathbf{0}$$
+  Şimdi bu `1` olan bitlerin değerlerini toplayalım:
+  $$128 + 64 + 32 + 16 + 8 + 4 = \mathbf{252}!$$
+  *(Pratik Mühendis Yöntemi: Toplam 256'dan sıfır olan son iki bitin değerini [yani 4'lük blok büyüklüğünü] çıkarın: $256 - 4 = \mathbf{252}$).*
+
+---
+
+##### 5. Adım: Canlı Örnek — Cihaz Yanlış Yapılandırılırsa Ne Olur?
+* **Router A'ya girdiniz:** `IP: 192.168.1.1` - `Mask: 255.255.255.252` (1. Kutuda olduğunu bilir).
+* **Router B'ye yanlışlıkla:** `IP: 192.168.1.5` - `Mask: 255.255.255.252` girdiniz.
+* **Ne Olur?**  
+  Router A kendi maskesine bakar: *"Benim mahallem 0 ile 3 arasındadır. Karşımdaki 192.168.1.5 adresi ise 4 ile 7 arasındaki başka bir mahalleye aittir!"* der. Aralarında fiziksel kablo takılı olsa dahi **birbirlerini görmezler ve hat çalışmaz!** İletişim için Router B'ye mutlaka o kutunun içindeki diğer kullanılabilir sayı olan `192.168.1.2` verilmelidir.
+
+---
+
 ### 4. Default Gateway (Varsayılan Ağ Geçidi)
 
 * **Nedir:** Yerel alt ağ (Subnet) dışındaki hedeflere (örneğin internete veya farklı bir VLAN'a) gidecek tüm paketlerin teslim edildiği yönlendiricinin (Router) yerel IP adresidir.
