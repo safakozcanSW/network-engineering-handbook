@@ -611,54 +611,113 @@ graph LR
 
 ---
 
-## 🧩 Modül 6: Bütünleşik Uygulama Senaryosu (Uçtan Uca Örnek)
+## 🧩 Modül 6: Bütünleşik Uygulama Senaryosu (Şirket İçi Kurumsal Ağ Mimarisi)
 
-Bir kullanıcının kafedeki dizüstü bilgisayarından şirket içindeki `https://sirket.local` web uygulamasına eriştiği senaryoda tüm protokollerin birbirleriyle etkileşimi:
+Tüm bu rehber boyunca öğrendiğimiz 14 temel ağ kavramının kurumsal bir ofis ortamında birbiriyle nasıl çalıştığını görmek için **şirket içinden** gerçekçi bir senaryo kuralım:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as 💻 Kullanıcı (Kafe)
-    participant CafeDHCP as 📶 Kafe Wi-Fi (DHCP/Router)
-    participant VPN as 🛡️ WireGuard VPN Tüneli
-    participant CorpFW as 🧱 Şirket Firewall
-    participant CorpDNS as 🧭 Şirket İçi DNS
-    participant CorpVLAN as 🔀 DMZ Switch (VLAN 30)
-    participant RevProxy as ⚖️ Nginx Reverse Proxy
-    participant App as 🖥️ Web Uygulama Sunucusu
+> 🏢 **Senaryo:**  
+> Ahmet sabah ofise gelir, masasına oturur ve dizüstü bilgisayarına şirket masasındaki **ağ kablosunu (Ethernet)** takar.  
+> Ahmet hem şirket içindeki muhasebe portalı olan **`https://portal.sirket.local`** adresine girmek hem de araştırma yapmak için dış internetteki **`https://google.com`** sitesine erişmek istemektedir.  
+> Ahmet kabloyu taktığı andan itibaren arka planda milisaniyeler içinde hangi protokoller sırayla devreye girer?
 
-    Note over User, CafeDHCP: 1. Yerel Ağ Adresleme
-    User->>CafeDHCP: DHCP DORA İstekleri
-    CafeDHCP-->>User: IP: 192.168.1.45, Mask: /24, Gateway: 192.168.1.1
+---
 
-    Note over User, VPN: 2. Güvenli Tünel Kurulumu
-    User->>VPN: WireGuard Handshake (UDP Tünel)
-    VPN-->>User: Sanal Arayüz IP: 10.8.0.5
+### 📖 Adım Adım Temel Akış (Ofis Masasından Şirket İçi Portala Erişim)
 
-    Note over User, CorpDNS: 3. Şirket İçi İsim Çözümleme
-    User->>CorpDNS: sirket.local nerede? (VPN İçinden)
-    CorpDNS-->>User: 10.0.10.50 (Nginx IP'si)
+#### 1. Aşama: Masaya Kabloyu Takma ve Kimlik Alma (Switch Portu, VLAN ve DHCP)
+1. **Fiziksel Bağlantı:** Ahmet Ethernet kablosunu bilgisayarına taktığı anda ağ kartı (NIC) ile duvardaki prizin bağlı olduğu **kenar switch (Access Switch)** arasında Katman 1/2 seviyesinde elektrik sinyalleri başlar.
+2. **VLAN Ataması:** Switch portu önceden tanımlanmıştır; Ahmet'in portu **`VLAN 10 (Personel Ağı)`** Access portudur.
+3. **Otomatik Yapılandırma (DHCP DORA):** Ahmet'in bilgisayarında henüz bir IP yoktur. Bilgisayar ağa *"Ben buradayım, bana IP verin"* çağrısı yapar.
+   * Şirketin merkezi DHCP sunucusu (veya Active Directory) Ahmet'e şu bilgileri teslim eder:
+     * **Atanan IP:** `10.10.1.45` (VLAN 10 bloğundan)
+     * **Subnet Mask:** `255.255.255.0` (`/24`)
+     * **Default Gateway:** `10.10.1.1` (Ofis katının ana yönlendiricisi / Core Switch)
+     * **DNS Sunucuları:** `10.10.1.10` (Şirket içi DNS)
 
-    Note over User, CorpFW: 4. Yönlendirme ve Güvenlik Denetimi
-    User->>CorpFW: HTTPS İsteği (Hedef: 10.0.10.50:443)
-    CorpFW->>CorpFW: Stateful Denetim & ACL Kontrolü (İzin Verildi)
+#### 2. Aşama: "portal.sirket.local Nerede?" (Şirket İçi DNS Çözümleme)
+1. Ahmet tarayıcısını açar ve `https://portal.sirket.local` yazar.
+2. Bilgisayar, DHCP'den öğrendiği şirket içi DNS sunucusuna (`10.10.1.10`) bir DNS sorgusu fırlatır:  
+   > *"portal.sirket.local adresinin IP'si nedir?"*
+3. Şirket DNS sunucusu kendi iç kayıtlarına bakar ve cevap döner:  
+   > *"O adres sunucu odamızdaki `10.20.1.50` adresidir!"*
 
-    Note over CorpFW, RevProxy: 5. Ağ İzolasyonu ve Karşılama
-    CorpFW->>CorpVLAN: Paket 802.1Q VLAN 30 etiketiyle trunk üzerinden akar
-    CorpVLAN->>RevProxy: 10.0.10.50 port 443'e teslim
+#### 3. Aşama: Departmanlar Arası Geçiş ve Güvenlik Duvarı (Inter-VLAN Routing & Firewall)
+1. Ahmet'in bilgisayarı hedef IP'ye bakar: `10.20.1.50`.
+2. Kendi IP'si `10.10.1.45` ve maskesi `/24` olduğu için hedefin **farklı bir mahallede (VLAN 20 Sunucu Ağı)** olduğunu anlar. Paketi doğrudan gönderemez; **Default Gateway**'e (`10.10.1.1`) teslim eder.
+3. Paket şirket omurga anahtarına (**Core Switch**) ve oradan **İç Ağ Güvenlik Duvarına (Internal Firewall)** gelir.
+4. **Güvenlik Kontrolü:** Güvenlik Duvarı kural tablosuna bakar:  
+   * *"Kaynak: VLAN 10 (Personel) $\rightarrow$ Hedef: VLAN 20 (Sunucular: Port 443 HTTPS). İzin var mı?"*  
+   * Kuralda izin tanımlıdır; güvenlik duvarı paketin geçişini onaylar ve durumu hafızasına kaydeder (**Stateful Inspection**).
 
-    Note over RevProxy, App: 6. SSL Çözme ve Yük Dengeleme
-    RevProxy->>RevProxy: SSL Sertifikası Karşılanır ve Çözülür
-    RevProxy->>App: TCP Soketi (10.0.20.12:3000) üzerinden istek iletilir
-    App-->>RevProxy: HTTP 200 Yanıtı
-    RevProxy-->>User: Şifreli HTTPS Yanıtı (VPN tünelinden ekrana)
-```
+#### 4. Aşama: Sunucu Odasında Karşılama ve Yük Dağıtımı (Reverse Proxy - Nginx / HAProxy)
+1. Paket sunucu odasındaki `10.20.1.50` adresine ulaşır. Ancak bu IP tek bir veritabanı veya backend makinesi değildir; kapıdaki **Reverse Proxy (Nginx)** sunucusudur.
+2. **SSL Termination:** Nginx, HTTPS şifrelemesini çözer ve gelen isteği kontrol eder.
+3. **Load Balancing (Yük Dengeleme):** Nginx'in arkasında çalışan 3 adet uygulama sunucusu vardır:
+   * 1. Sunucu: %90 CPU yükünde (Yoğun)
+   * 2. Sunucu: %15 CPU yükünde (Boşta)
+   * Nginx isteği boşta olan 2. sunucunun soketine (`10.20.1.62:3000`) aktarır.
+4. Muhasebe sayfası üretilir, Nginx üzerinden paket tekrar paketlenir, aynı yoldan Ahmet'in ekranına döner ve sayfa açılır!
 
-### Adım Adım İşleyiş Mekanizması:
+---
 
-1. **Adresleme (Yerel Katman):** Bilgisayar kafedeki Wi-Fi'a bağlandığında DHCP (DORA süreci) üzerinden `192.168.1.45` IP'sini, `/24` Subnet Mask'ını ve `192.168.1.1` Default Gateway'ini alır.
-2. **Tünelleme (VPN Katmanı):** Kullanıcı şirket içi sisteme güvenle erişmek için WireGuard VPN'ini çalıştırır. Cihazda `10.8.0.5` şeklinde şifreli bir sanal ağ arayüzü (`wg0`) oluşturulur.
-3. **Çözümleme (DNS Katmanı):** Tarayıcı `sirket.local` adresini VPN tünelinin diğer ucunda yer alan şirket içi DNS sunucusuna sorar; DNS sunucusu cevap olarak kurum içi Reverse Proxy IP'sini (`10.0.10.50`) döner.
-4. **Yönlendirme & Güvenlik (Firewall Katmanı):** Paketler kafenin yerel internetini atlayarak tünel içinden şirketin ana Firewall cihazına akar. Güvenlik duvarının Stateful denetim kuralları bu VPN kullanıcısının DMZ bölgesine geçişine onay verir.
-5. **Ağ İzolasyonu (VLAN Katmanı):** Paketler kurum içi switch omurgasında IEEE 802.1Q etiketli `VLAN 30 (DMZ)` Trunk hattı üzerinden hedefe aktarılır.
-6. **Karşılama ve Yük Dengeleme (Reverse Proxy & Uygulama):** Trafiği Nginx karşılar. Nginx SSL sertifikasını uçta sonlandırır (SSL Termination) ve arkada çalışan konteyner veya sanal makinelerden en uygun olana isteği TCP soketi (`10.0.20.12:3000`) üzerinden iletir.
+### 🔄 Şirket İçinde Olabilecek Tüm İhtimaller ve Mimari Varyasyonlar
+
+Gerçek bir şirket ortamında çalışanların ve sunucuların karşılaşabileceği tüm farklı kullanım senaryoları şunlardır:
+
+---
+
+#### 1. İhtimal (Proxy): Ahmet Dış İnternete (`google.com`) Çıkmak İsterse Ne Olur? (Forward Proxy)
+Ahmet şirket içi portala değil de internetteki bir siteye (`google.com`, haber sitesi vb.) gitmek istediğinde şirketler güvenliği sağlamak için trafiği doğrudan dışarı salmaz:
+* **Forward Proxy Devrededir:** Bilgisayarların işletim sistemine veya tarayıcısına bir vekil sunucu adresi (örn. `proxy.sirket.local:8080` — Squid, Zscaler veya BlueCoat) tanımlanmıştır.
+* **Denetim ve Filtreleme:** Ahmet'in yaptığı tüm dış internet istekleri önce bu **Forward Proxy**'ye gider.
+  * Proxy bakar: *"Ahmet mesai saatinde nereye gitmek istiyor? Kumar, oyun veya zararlı yazılım sitesi mi?"*
+  * Eğer yasaklı bir kategoriyse ekrana anında `Erişim Şirket Politikası Gereği Engellendi` uyarısı basar.
+  * İzin verilen bir siteyse, Proxy Ahmet'in yerine internete çıkar, web sayfasını alır, virüs taramasından geçirir ve temizse Ahmet'e teslim eder. Dış dünyadaki web sitesi Ahmet'in IP'sini değil, yalnızca şirketin Proxy sunucusunu görür.
+
+---
+
+#### 2. İhtimal (NAT): Şirketteki 1000 Bilgisayar İnternete Nasıl Çıkar? (PAT / Source NAT)
+* Şirketin içinde herkes `10.10.x.x` gibi yerel (Private) IP'ler kullanır. Bu IP'ler internette geçersizdir.
+* Ofisteki tüm çalışanlar internete çıkarken şirketin ana router'ı devreye girer.
+* **PAT (Port Address Translation) İşlemi:** Şirketin internet servis sağlayıcısından aldığı tek bir kurumsal fiber **Public IP** (`212.156.x.x`) vardır. Router, içerideki 1000 bilgisayarın paketlerini bu tek Public IP'nin arkasına farklı port numaraları açarak gizler ve internete çıkarır. Dönüş paketlerini de NAT tablosuna bakarak ilgili personelin bilgisayarına teslim eder.
+
+---
+
+#### 3. İhtimal (VPN): Şirket İçindeyken VPN Ne Zaman Kullanılır? (Site-to-Site VPN & Hibrit Bulut)
+*"Biz şirket içindeyiz, masamızda oturuyoruz, VPN ile ne işimiz var?"* sorusunun cevabı kurumsal yapılarda şöyledir:
+* **Uzak Şube / Fabrika Senaryosu:** Ahmet İstanbul ofisinde oturuyordur; ancak şirketin ana ERP veritabanı Ankara Genel Merkezinde veya Gebze'deki fabrikadadır.
+* **Site-to-Site IPsec VPN:** Ahmet bilgisayarında herhangi bir VPN programı çalıştırmaz. Ancak İstanbul ofisinin ana router'ı ile Ankara ofisinin ana router'ı arasında internet üzerinden 7/24 kurulu duran kalıcı, şifreli bir **Site-to-Site VPN Tüneli** vardır.
+* Ahmet tarayıcısına Ankara'daki bir IP'yi (`10.50.1.100`) yazdığı anda, İstanbul'daki router paketi alır, şifreler, internet üzerinden Ankara'daki router'a fırlatır. Ankara'daki router şifreyi çözer ve sunucuya teslim eder. Ahmet şehirler arası bir VPN tünelinden geçtiğinin farkına bile varmaz; sanki yan odadaki sunucuyla konuşuyor gibi hisseder.
+* **Aynı Şekilde Bulut (AWS / Azure) Erişimi:** Şirketin sunucuları AWS bulutunda bir sanal ağda (VPC) duruyorsa, şirket ofisi ile AWS arasında yine bir Site-to-Site VPN veya doğrudan özel kiralık hat (AWS Direct Connect) bulunur.
+
+---
+
+#### 4. İhtimal (Ağ İzolasyonu): Misafir Wi-Fi'ı vs Personel Ağı
+* Şirkete dışarıdan bir misafir geldiğinde veya bir çalışan şahsi cep telefonunu Wi-Fi'a bağladığında:
+* Erişim noktası (Access Point) bu cihazı otomatik olarak **`VLAN 99 (Misafir Ağı)`** içine hapseder.
+* Misafir ağına tanımlanan Güvenlik Duvarı kuralı şudur:
+  * `Misafir Ağı -> İnternet: İZİN VER (NAT ile)`
+  * `Misafir Ağı -> Şirket İçi Sunucular (VLAN 20): KESİNLİKLE ENGELLE (DROP)`
+* Bu sayede misafirin telefonunda bir virüs veya casus yazılım olsa dahi şirket içi muhasebe ve veritabanı sunucularına asla paket atamaz.
+
+---
+
+#### 5. İhtimal (Sistem Yöneticisi / SSH Erişimi): Bastion Host (Jump Server)
+* Ahmet normal bir personel değil de sunucuları yöneten bir Sistem Yöneticisi (DevOps / Sysadmin) olsun. Sunucunun içine terminalden bağlanmak (`SSH Port 22`) istiyor.
+* Kurumsal güvenlik politikası gereği, ofis bilgisayarlarından sunuculara doğrudan SSH bağlantısı açmak yasaktır.
+* **Bastion Host (Atlama Sunucusu):** Ahmet önce çok sıkı korunan, 2 faktörlü doğrulama (2FA/MFA) ile korunan özel bir ara sunucuya (**Jump Host**) SSH yapar. O sunucuya girdikten sonra oradan hedef veritabanı veya uygulama sunucusuna atlar. Böylece tüm yönetimsel hareketler tek bir noktada kayıt altına (audit log) alınır.
+
+---
+
+### 📊 Şirket İçi Mekanizmaların Karşılaştırma Özeti
+
+| Mekanizma | Şirket İçindeki Yeri | Temel Görevi | Ahmet Bu Aşamada Ne Hisseder? |
+| :--- | :--- | :--- | :--- |
+| **DHCP** | Ofis Kenar Ağı | IP, maske ve gateway atar | Kabloyu takar takmaz internet ışığı yanar |
+| **İç DNS** | Active Directory / Merkez | `.local` alan adlarını IP'ye çevirir | Karmaşık IP ezberlemeden isimle girer |
+| **VLAN & Trunk** | Switch Altyapısı | Departmanları birbirinden yalıtır | Yan odadaki muhasebe dosyalarına izinsiz erişemez |
+| **Internal Firewall** | Core Switch / Router Arası | Katmanlar arası kuralları denetler | Yetkisiz bir porta giderse bağlantı reddedilir |
+| **Reverse Proxy** | Sunucu Odası Girişi | Yük dağıtır, SSL çözer | Sunuculardan biri çökse bile sistem kesintiye uğramaz |
+| **Forward Proxy** | Şirket İnternet Çıkış Kapısı | Dış siteleri filtreler, virüs tarar | Zararlı sitelere girmeye kalktığında engel sayfası görür |
+| **Site-to-Site VPN** | Merkez - Şube Router'ları | Şehirler arası ofisleri birbirine bağlar | Ankara veya buluttaki sunuculara sanki yan odadaymış gibi erişir |
+| **PAT (NAT)** | Şirket Dış Çıkış Router'ı | 1000 cihazı tek Public IP ile internete çıkarır | İç IP'si dünyadan gizlenerek internette gezinir |
