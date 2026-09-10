@@ -627,9 +627,14 @@ Tüm bu rehber boyunca öğrendiğimiz 14 temel ağ kavramının kurumsal bir of
 #### 0. Aşama: Sahne Arkası — IT Mühendisi Bu Ağı Nasıl Kurdu? (Altyapı, Switch ve DHCP Ayarları)
 Ahmet sabah ofise gelip kabloyu takmadan **önce**, şirketin IT (Bilgi İşlem) mühendisi bu yapıyı sıfırdan adım adım şu mantıkla kurmuştur:
 
-1. **İnternet Girişi ve Tek Ana Modem/Router Konumu:**
-   * IT çalışanı, servis sağlayıcıdan (ISP) gelen kurumsal fiber kabloyu sistem odasındaki ana modeme / kenar yönlendiriciye (Edge Router / Firewall) bağlar.
-   * Dış dünyadan gelen internet tek bir genel (Public) IP'dir. Ancak bina 4 katlıdır ve içeride yüzlerce bilgisayar olacaktır. Tek bir modem tüm binaya yetişemez; bu yüzden modem yalnızca interneti içeri sokan bir "dış kapı" görevi görür.
+1. **İnternet Girişi, Ana Modem ve Kenar Güvenlik Duvarı (Firewall / Edge Router) Konumu:**
+   * IT çalışanı, servis sağlayıcıdan (ISP) gelen kurumsal fiber kabloyu sistem odasındaki ana modeme / kenar yönlendiriciye ve hemen arkasındaki **Güvenlik Duvarına (Firewall)** bağlar.
+   * > 🧱 **"Buradaki Firewall Nedir? Fiziksel Bir Kutu mudur, Yazılım mıdır?"**  
+     > Kurumsal şirketlerde Firewall genellikle **fiziksel bir donanım kutusudur** (Fortinet FortiGate, Palo Alto, Cisco ASA/Firepower gibi markaların sunucu kabinine [Rack kabin] monte edilen 1U/2U boyutlarındaki özel cihazlarıdır).  
+     > * **Fiziksel Kutu (Hardware Appliance):** İçerisinde ağ paketlerini saniyede gigabitlerce hızda taramak için özel güvenlik işlemcileri (ASIC/NPU) barındıran müstakil bir sunucu kutusudur. Modemden çıkan internet kablosu doğrudan bu kutunun `WAN` (dış ağ) portuna girer. Şirketin iç ağına giden kablo ise kutunun `LAN` (iç ağ) portundan çıkar.  
+     > * **Görevi:** Şirketin sınır kapısındaki "Silahlı Güvenlik / Gümrük Muhafaza Memurudur". Dış internetten gelen her bir paketi inceler; şirket içine sızmaya çalışan hacker taramalarını, zararlı port isteklerini veya DDoS saldırılarını saniyeler içinde fiziksel olarak engeller.  
+     > *(Not: Küçük işletmeler veya bulut ortamlarında bu işlem pfSense, OPNsense veya AWS Security Group gibi **yazılımsal firewall** olarak da çalıştırılabilir).*
+   * **Neden Tek Modem Yetmez?** Dış dünyadan gelen internet tek bir genel (Public) IP'dir. Ancak bina 4 katlıdır ve içeride yüzlerce bilgisayar olacaktır. Ev tipi küçük bir modem yüzlerce bilgisayarın bağlantısını ve güvenliğini kaldıramaz, hemen kilitlenir; bu yüzden modem yalnızca fiber sinyali elektrik sinyaline çeviren basit bir köprü (Bridge) olarak kalır, asıl yükü bu donanımsal Firewall kutusu ve Core Switch üstlenir.
 2. **Omurga (Core Switch) ve Kenar Anahtarların (Access Switch) Yerleşimi:**
    * **Sistem Odası (Merkez):** Modemin hemen arkasına yüksek hızlı, ana omurga anahtarı (**Core Switch**) konur.
    * **Katlar (Kenar Noktalar):** Her kata birer adet **Kenar Anahtar (Access Switch)** yerleştirilir (Örn: 2. Kat Switch'i, 3. Kat Switch'i).
