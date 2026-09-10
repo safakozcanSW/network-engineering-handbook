@@ -173,7 +173,9 @@ Maske, IP adresinin üzerine konulan bir filtre gibidir:
 
 * **Aynı Ağda mıyız, Farklı Ağda mı? (İletişim Kararı):**  
   * Yan odadaki bilgisayar `192.168.1.60` ise $\rightarrow$ İkinizin de mahalle kısmı `192.168.1` olduğu için **aynı yerel ağdasınız**. Paket modeme gitmeden switch üzerinden doğrudan gider.
-  * Karşıdaki bilgisayar `192.168.2.50` ise $\rightarrow$ Onun mahallesi `192.168.2` olduğu için **farklı bir mahallededir**. Ona doğrudan seslenemezsiniz; paketi kapıdaki yönlendiriciye (Default Gateway) teslim etmeniz gerekir.
+  * Karşıdaki bilgisayar `192.168.2.50` ise $\rightarrow$ Onun mahallesi `192.168.2` olduğu için **farklı bir mahallededir**. Ona doğrudan seslenemezsiniz; paketi kapıdaki yönlendiriciye (**Default Gateway**) teslim etmeniz gerekir.
+    > ℹ️ **Default Gateway Nedir ve Burada Ne Yapar?**  
+    > Sitenin **güvenlik nizamiye kapısıdır** (genelde evdeki modeminizin IP'si: `192.168.1.1`). Bilgisayarınız kendi mahallesi dışındaki bir hedefe (farklı bir alt ağa veya internete) paket göndermek istediğinde: *"Ben bu adrese doğrudan ulaşamam, al bu paketi hedefine sen ulaştır"* diyerek paketi Default Gateway'e verir. Gateway de iki farklı mahalle arasındaki köprüyü kurarak paketi karşı tarafa yönlendirir (Detayları hemen bir sonraki [Madde 4'te](#4-default-gateway-varsayılan-ağ-geçidi) inceleyeceğiz).
 
 ---
 
