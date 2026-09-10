@@ -628,13 +628,22 @@ Tüm bu rehber boyunca öğrendiğimiz 14 temel ağ kavramının kurumsal bir of
 Ahmet sabah ofise gelip kabloyu takmadan **önce**, şirketin IT (Bilgi İşlem) mühendisi bu yapıyı sıfırdan adım adım şu mantıkla kurmuştur:
 
 1. **İnternet Girişi, Ana Modem ve Kenar Güvenlik Duvarı (Firewall / Edge Router) Konumu:**
-   * IT çalışanı, servis sağlayıcıdan (ISP) gelen kurumsal fiber kabloyu sistem odasındaki ana modeme / kenar yönlendiriciye ve hemen arkasındaki **Güvenlik Duvarına (Firewall)** bağlar.
+   * > 🔌 **"ISP'den Tek Bir Kablo Geliyor; Bu Kablo Hem Modeme Hem Firewall'a Nasıl Bağlanıyor? Tek Kablo İki Cihaza mı Girer?"**  
+     > **Hayır, tek bir kablo iki cihaza aynı anda girmez! Bağlantı YAN YANA değil, ARKA ARKAYA (Seri / Zincirleme) yapılır:**  
+     > 1. **Dışarıdan Gelen Hat (Fiber / Sokak Kablosu):** Türk Telekom / Turkcell gibi servis sağlayıcının getirdiği sarı fiber kablo **doğrudan ve yalnızca ana modeme / ONT cihazına (Optik Ağ Sonlandırıcı)** takılır.  
+     > 2. **Modem ile Firewall Arasındaki Köprü (İkinci Kablo - Bakır Ethernet):** Modemin arkasındaki `LAN 1` portundan IT mühendisi **ikinci bir ethernet kablosu** çıkarır ve bu kabloyu donanımsal Firewall kutusunun **`WAN (İnternet)`** portuna takar!  
+     > 3. **Firewall'dan İç Ağa (Üçüncü Kablo):** Firewall kutusunun **`LAN`** portundan çıkan üçüncü kablo da ana omurga anahtarına (**Core Switch**) gider.  
+     > 
+     > 🔗 **Fiziksel Kablo Zinciri:**  
+     > `[Sokak / ISP Fiber Kablosu]` $\longrightarrow$ **Modem/ONT** $\longrightarrow$ `[Ethernet Patch Kablosu]` $\longrightarrow$ **Firewall (WAN Portu)** $\longrightarrow$ `[Ethernet Patch Kablosu]` $\longrightarrow$ **Core Switch (LAN)**  
+     > 
+     > 💡 **Püf Noktası (Köprü / Bridge Modu):** IT mühendisi modemin içine girip onu **"Bridge (Köprü) Modu"**na alır. Böylece modem hiçbir IP dağıtımı veya güvenlik işine karışmaz; sokaktan gelen fiber ışık sinyalini elektriğe çevirip olduğu gibi Firewall'a fırlatan aptal bir dönüştürücüye dönüşür. Dış internetin gerçek Public IP'sini doğrudan Firewall kutusu üzerine alır.
    * > 🧱 **"Buradaki Firewall Nedir? Fiziksel Bir Kutu mudur, Yazılım mıdır?"**  
      > Kurumsal şirketlerde Firewall genellikle **fiziksel bir donanım kutusudur** (Fortinet FortiGate, Palo Alto, Cisco ASA/Firepower gibi markaların sunucu kabinine [Rack kabin] monte edilen 1U/2U boyutlarındaki özel cihazlarıdır).  
-     > * **Fiziksel Kutu (Hardware Appliance):** İçerisinde ağ paketlerini saniyede gigabitlerce hızda taramak için özel güvenlik işlemcileri (ASIC/NPU) barındıran müstakil bir sunucu kutusudur. Modemden çıkan internet kablosu doğrudan bu kutunun `WAN` (dış ağ) portuna girer. Şirketin iç ağına giden kablo ise kutunun `LAN` (iç ağ) portundan çıkar.  
+     > * **Fiziksel Kutu (Hardware Appliance):** İçerisinde ağ paketlerini saniyede gigabitlerce hızda taramak için özel güvenlik işlemcileri (ASIC/NPU) barındıran müstakil bir sunucu kutusudur. Modemden çıkan ethernet kablosu bu kutunun `WAN` portuna girer; iç ağa gidecek olan kablo ise `LAN` portundan çıkar.  
      > * **Görevi:** Şirketin sınır kapısındaki "Silahlı Güvenlik / Gümrük Muhafaza Memurudur". Dış internetten gelen her bir paketi inceler; şirket içine sızmaya çalışan hacker taramalarını, zararlı port isteklerini veya DDoS saldırılarını saniyeler içinde fiziksel olarak engeller.  
      > *(Not: Küçük işletmeler veya bulut ortamlarında bu işlem pfSense, OPNsense veya AWS Security Group gibi **yazılımsal firewall** olarak da çalıştırılabilir).*
-   * **Neden Tek Modem Yetmez?** Dış dünyadan gelen internet tek bir genel (Public) IP'dir. Ancak bina 4 katlıdır ve içeride yüzlerce bilgisayar olacaktır. Ev tipi küçük bir modem yüzlerce bilgisayarın bağlantısını ve güvenliğini kaldıramaz, hemen kilitlenir; bu yüzden modem yalnızca fiber sinyali elektrik sinyaline çeviren basit bir köprü (Bridge) olarak kalır, asıl yükü bu donanımsal Firewall kutusu ve Core Switch üstlenir.
+   * **Neden Tek Modem Yetmez?** Ev tipi küçük bir modem yüzlerce bilgisayarın bağlantısını ve güvenliğini kaldıramaz, hemen kilitlenir; bu yüzden modem yalnızca yukarıda anlattığımız gibi bir dönüştürücü olarak kalır, asıl yükü bu donanımsal Firewall kutusu ve Core Switch üstlenir.
 2. **Omurga (Core Switch) ve Kenar Anahtarların (Access Switch) Yerleşimi:**
    * **Sistem Odası (Merkez):** Modemin hemen arkasına yüksek hızlı, ana omurga anahtarı (**Core Switch**) konur.
    * **Katlar (Kenar Noktalar):** Her kata birer adet **Kenar Anahtar (Access Switch)** yerleştirilir (Örn: 2. Kat Switch'i, 3. Kat Switch'i).
