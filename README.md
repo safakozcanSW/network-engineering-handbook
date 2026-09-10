@@ -32,6 +32,8 @@ Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik 
 
 ## 📊 Özet Referans Tablosu (Hızlı Bakış)
 
+![14 Temel Ağ Kavramı Adım Adım Yol Haritası](assets/on_dort_adim_haritasi.jpg)
+
 | Protokol / Kavram | OSI Katmanı | Adresleme / Biçim | Temel Görevi |
 | :--- | :--- | :--- | :--- |
 | **MAC** | Katman 2 (Data Link) | 48-bit Hex (`52:54:00:...`) | Yerel ağdaki fiziksel kart kimliği |
@@ -721,6 +723,28 @@ Artık altyapı hazırdır! Şimdi Ahmet ofise gelir ve masasına oturur...
      * **Subnet Mask (Alt Ağ Maskesi):** `255.255.255.0` (`/24`)
      * **Default Gateway (Varsayılan Ağ Geçidi):** `10.10.1.1` (Ofis katının ana yönlendiricisi / Core Switch)
      * **DNS Sunucuları:** `10.10.1.10` (Şirket içi DNS)
+
+---
+
+> 📱 **Alternatif Durum: Ahmet Kablo Yerine Telefonuyla / Laptopuyla Wi-Fi'a Bağlanırsa Ne Olur? (Ve ARP Nerede Devreye Girer?)**  
+> Ahmet masadaki kabloyu takmak yerine cebinden akıllı telefonunu çıkarıp şirketin kurumsal Wi-Fi ağına (`Sirket-Corp`) bağlandığında süreç kablosuz olarak şöyle işler:
+> 
+> 1. **Kablosuz Katman 2 El Sıkışması (802.11 Wi-Fi):** Telefon tavandaki Access Point (AP - Kablosuz Erişim Noktası) ile radyo dalgaları üzerinden bağlantı kurar. Access Point kurumsal switch'e Trunk port ile bağlıdır ve `Sirket-Corp` yayınına bağlanan telefonları otomatik olarak **`VLAN 10 (Personel Ağı)`** içine sokar.
+> 2. **DHCP ile IP Alma:** Telefon yine havadan DHCP DORA paketleri atarak `10.10.1.78` IP'sini, ağ geçidini (`10.10.1.1`) ve DNS'i alır.
+> 3. **🔍 ARP Sahneye Çıkıyor (Adım 1 - IP Çakışma Kontrolü / Gratuitous ARP):**  
+>    Telefon IP'yi alır almaz hemen kullanmaya başlamaz! Önce tüm Wi-Fi ağına doğru bir **Gratuitous ARP (Karşılıksız ARP)** yayını fırlatır:  
+>    > *"Ey ahali! 10.10.1.78 IP'sini kullanan var mı? Varsa söylesin!"*  
+>    * Eğer kimseden ses çıkmazsa, telefon bu IP'nin gerçekten boşta ve güvenli olduğunu anlar.
+>    * Eğer başka bir cihaz *"O IP bende var"* diye yanıt dönerse, ekranda meşhur **"IP Adresi Çakışması (IP Address Conflict)"** hatası çıkar ve telefon DHCP'den başka bir IP talep eder.
+> 4. **🔍 ARP Sahneye Çıkıyor (Adım 2 - Kapının MAC Adresini Bulma):**  
+>    Telefon internete veya şirket portalına gitmek istediğinde paketi **Default Gateway'e (`10.10.1.1`)** teslim etmek zorundadır. Ancak telefon, Gateway'in IP'sini bilse de henüz **fiziksel MAC adresini bilmemektedir!**  
+>    * Telefon havaya (Wi-Fi ağına) bir **ARP Request (Broadcast)** fırlatır:  
+>      > *"Ağ geçidi olan 10.10.1.1 kimde? MAC adresin nedir?"*  
+>    * Tavandaki Access Point bu yayını switch'e iletir. Core Switch / Gateway bu yayını duyar ve doğrudan Ahmet'in telefonuna **ARP Reply (Unicast)** yanıtı verir:  
+>      > *"10.10.1.1 benim! Benim MAC adresim: `00:1A:2B:3C:4D:5E`"*  
+>    * Telefon bu bilgiyi kendi **ARP Tablosuna (ARP Cache)** kaydeder. Artık dışarıya veya portala gidecek tüm veri paketlerinin arkasına bu MAC adresini yapıştırarak hızlıca iletir.
+
+---
 
 #### 2. Aşama: "portal.sirket.local Nerede?" (Şirket İçi DNS Çözümleme)
 1. Ahmet tarayıcısını açar ve `https://portal.sirket.local` yazar.
