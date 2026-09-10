@@ -624,6 +624,8 @@ Tüm bu rehber boyunca öğrendiğimiz 14 temel ağ kavramının kurumsal bir of
 
 ### 📖 Adım Adım Temel Akış (Ofis Masasından Şirket İçi Portala Erişim)
 
+![Kurumsal Ağ Mimarisi ve Uçtan Uca Akış](assets/kurumsal_ag_mimarisi.jpg)
+
 #### 0. Aşama: Sahne Arkası — IT Mühendisi Bu Ağı Nasıl Kurdu? (Altyapı, Switch ve DHCP Ayarları)
 Ahmet sabah ofise gelip kabloyu takmadan **önce**, şirketin IT (Bilgi İşlem) mühendisi bu yapıyı sıfırdan adım adım şu mantıkla kurmuştur:
 
