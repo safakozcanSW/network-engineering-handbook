@@ -143,7 +143,39 @@ Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik 
 * **Gündelik Hayatta Karşılığı:**  
   > 💡 **Analoji:** Bir sitenin **blok ve daire numarası** ayrımıdır. Adresiniz *"A Blok No: 5"* ise, maske size kimin sizinle aynı blokta (aynı yerel ağda) olduğunu, kimin yan blokta oturduğunu söyler. Yan bloktakine seslenmek için site güvenlik kapısına (Gateway) gitmeniz gerekir.
 * **Alternatif Kullanım Amaçları ve Örnekleri:**
-  * **Bulut Altyapısı Güvenlik Mimarisi (AWS VPC / GCP):** Bir e-ticaret sisteminde veritabanları `/28` (14 host) maskeli küçük ve dış dünyaya tamamen kapalı bir özel alt ağa (Private Subnet) konur. Yalnızca web sunucularının bulunduğu `/24` alt ağından gelen bağlantılara izin verilerek doğrudan internet erişimi engellenir.
+  * **Bulut Altyapısı Güvenlik Mimarisi (AWS VPC / GCP) — Derinlemesine İnceleme:**  
+    Kurumsal bulut mimarilerinde çok katmanlı (**3-Tier Architecture: Web - App - Database**) güvenlik tasarımı alt ağların (Subnetting) doğru izole edilmesine dayanır:
+    
+    ```text
+    [ İNTERNET ] 
+         │ 
+         ▼ (Port 80 / 443)
+    ┌───────────────────────────────────────────────────────────┐
+    │ Public Subnet: 10.0.1.0/24 (Internet Gateway - IGW Açık)  │
+    │ └─► Web Sunucuları / Load Balancer (Public IP var)        │
+    └─────────────────────────────┬─────────────────────────────┘
+                                  │ (Yalnızca Port 5432 - Dahili İletişim)
+                                  ▼
+    ┌───────────────────────────────────────────────────────────┐
+    │ Private Subnet: 10.0.2.0/28 (Dış Dünyaya Tamamen Kapalı)  │
+    │ └─► PostgreSQL Veritabanı Kümesi (Yalnızca Private IP)    │
+    └───────────────────────────────────────────────────────────┘
+    ```
+
+    1. **Neden `/28` Maskesi (Kapasite ve İsraf Önleme)?**  
+       * $32 - 28 = 4$ bit host alanı bırakır: $2^4 = 16$ toplam IP adresi.  
+       * Standart ağlarda $16 - 2 = 14$ kullanılabilir host bulunur (AWS VPC'de ilk 4 ve son 1 IP bulut servisleri için rezerve edildiğinden geriye tam $11$ IP kalır).  
+       * Bir e-ticaret sitesinde web katmanı trafiğe göre 50-100 sunucuya kadar büyüyebilirken (`Auto-scaling`), veritabanı katmanı genellikle 1 Primary (Yazma) + 2 Read Replica (Okuma) gibi az sayıda (3-5 sunucu) düğümden oluşur. Dolayısıyla veritabanına devasa bir `/24` (254 IP) tahsis etmek IP israfıdır; `/28` maskesi hem güvenli hem de tam ihtiyaca uygundur.
+    
+    2. **Yönlendirme Tablosu (Route Table) İle Fiziksel İzolasyon:**  
+       * **Public Subnet:** Yönlendirme tablosunda `0.0.0.0/0 -> igw-xxxx` (*Internet Gateway*) tanımı bulunur; yani doğrudan internete çıkabilir ve internetten istek alabilir.  
+       * **Private Subnet:** Yönlendirme tablosunda **kesinlikle Internet Gateway (IGW) rotası yer almaz**. Bu subnet içindeki veritabanı sunucularına bir Public IP tanımlanamaz. Dış dünyadan bir saldırganın bu IP bloğuna doğrudan ping atması veya port taraması yapması fiziksel ve mantıksal olarak imkansızdır.
+    
+    3. **Güvenlik Grupları (Security Groups / Firewall Kuralları):**  
+       * Veritabanının önüne konulan Güvenlik Grubu (SG) kuralı şu şekilde kilitlenir:
+         * **Gelen Trafik (Inbound):** `Port 5432 (PostgreSQL)` $\rightarrow$ **Kaynak (Source):** Yalnızca `10.0.1.0/24` (Web Subnet CIDR) veya `sg-web-servers` güvenlik grubu.  
+         * **İnternet Kaynağı (`0.0.0.0/0`):** Tamamen engellenmiştir (Drop).  
+       * **Sonuç:** Bir saldırgan internet üzerinden veritabanına asla ulaşamaz. Veritabanına erişebilmek için önce `Public Subnet` üzerindeki bir web sunucusunun hacklenmesi (Pivot/Bastion noktası) gerekir. Bu da saldırı yüzeyini minimuma indirir.
   * **Noktadan Noktaya (Point-to-Point) Link Tasarımı:** İki kurumsal omurga router'ını birbirine bağlarken IP israfını önlemek amacıyla yalnızca 2 kullanılabilir IP veren `/30` (`255.255.255.252`) veya RFC 3021 standardı ile broadcast adresi gerektirmeyen `/31` maskeleri kullanılır.
 
 ---
