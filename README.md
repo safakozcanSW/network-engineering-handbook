@@ -372,7 +372,7 @@ Biz `/30` maskesinde tam **30 tane `1`** yazarız:
 
 ### 6. DHCP (Dynamic Host Configuration Protocol)
 
-* **Nedir:** Ağa yeni katılan cihazlara otomatik IP adresi, alt ağ maskesi, varsayılan ağ geçidi ve DNS gibi yapılandırma parametrelerini dinamik olarak dağıtan protokoldür (UDP 67 - Sunucu, UDP 68 - İstemci).
+* **Nedir:** Ağa yeni katılan cihazlara otomatik IP adresi, Subnet Mask (Alt Ağ Maskesi), Default Gateway (Varsayılan Ağ Geçidi) ve DNS gibi yapılandırma parametrelerini dinamik olarak dağıtan protokoldür (UDP 67 - Sunucu, UDP 68 - İstemci).
 * **DORA Süreci:**
   ```mermaid
   sequenceDiagram
