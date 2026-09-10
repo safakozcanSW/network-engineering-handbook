@@ -697,18 +697,69 @@ Ahmet sabah ofise gelip kabloyu takmadan **önce**, şirketin IT (Bilgi İşlem)
       switchport mode access
       switchport access vlan 10   # Port 5 artık sadece VLAN 10 (Personel) paketlerini geçirir
      ```
-4. **DHCP Sunucusunun Kurulması ve Yapılandırılması:**
-   * IT uzmanı her bilgisayara gidip tek tek elle IP yazmamak için sistem odasında bir DHCP sunucusu kurar (örneğin bir Linux sunucuda `isc-dhcp-server`, Windows Server üzerinde DHCP rolü veya doğrudan Core Switch/Router üzerinde):
-   * **DHCP Havuzu (Scope) Tanımı:**
-     ```text
-     Ağ Bloğu: 10.10.1.0 /24 (255.255.255.0)
-     Dağıtılacak IP Havuzu: 10.10.1.50 - 10.10.1.200 (Personel için dinamik IP'ler)
-     Ayrılan Sabit IP'ler: 10.10.1.1 - 10.10.1.49 (Yazıcılar, switch'ler ve sunucular için)
-     Default Gateway (Option 3): 10.10.1.1 (Core Switch IP'si)
-     DNS Sunucusu (Option 6): 10.10.1.10 (Şirket içi DNS)
-     Kira Süresi (Lease Time): 8 Saat (Mesai bitiminde IP boşa çıksın)
+4. **DHCP Sunucusunun Kurulması ve Yapılandırılması (Nasıl Yapılır?):**
+   * IT uzmanı her bilgisayara gidip tek tek elle IP yazmamak için sistem odasında bir DHCP sunucusu kurar. Kurumsal yapılarda bu işlem iki yaygın yöntemle yapılır:
+   
+   * **Yöntem A: Kurumsal Linux Sunucusunda DHCP (Örn: `isc-dhcp-server` / Kea):**  
+     IT mühendisi `/etc/dhcp/dhcpd.conf` dosyasına şu yapılandırmayı yazar:
+     ```bash
+     # /etc/dhcp/dhcpd.conf - VLAN 10 Personel Ağı DHCP Havuzu
+
+     subnet 10.10.1.0 netmask 255.255.255.0 {
+         # 1. Dinamik Dağıtılacak IP Havuzu (Ahmet gibi çalışanlar için)
+         range 10.10.1.50 10.10.1.200;
+
+         # 2. DHCP Seçenekleri (DHCP Options):
+         option routers 10.10.1.1;                     # Option 3: Default Gateway (Core Switch IP'si)
+         option subnet-mask 255.255.255.0;              # Option 1: Alt Ağ Maskesi (/24)
+         option domain-name-servers 10.10.1.10, 1.1.1.1; # Option 6: Şirket içi DNS & Yedek DNS
+         option domain-name "sirket.local";             # Option 15: Otomatik arama alan adı
+
+         # 3. Kira Süresi (Lease Time):
+         default-lease-time 28800;                      # 8 Saat (Mesai bitince IP boşa çıksın)
+         max-lease-time 43200;                          # En fazla 12 Saat
+     }
+
+     # 4. Statik Rezervasyon (MAC Adresine Sabit IP Kilitleme):
+     # Şirket ortak ağ yazıcısı veya sunucuların IP'si asla değişmemelidir:
+     host kat2-ortak-yazici {
+         hardware ethernet 00:11:22:33:44:55;           # Yazıcının fiziksel MAC adresi
+         fixed-address 10.10.1.20;                      # Havuz dışındaki sabit IP
+     }
      ```
-   * **DHCP Relay (ip helper-address):** DHCP sunucusu sistem odasında (VLAN 50'de) dursa bile, katlardaki switch ve router'lara `ip helper-address 10.50.1.10` yazılarak personelin attığı broadcast çağrılarının doğrudan bu sunucuya yönlendirilmesi sağlanır.
+     Yapılandırma kaydedildikten sonra servis başlatılır ve durumu test edilir:
+     ```bash
+     sudo systemctl enable --now isc-dhcp-server   # Sunucu açılışında otomatik başlasın
+     sudo systemctl status isc-dhcp-server        # Çalıştığını doğrula
+     ```
+
+   * **Yöntem B: Doğrudan Core Switch / Router Üzerinde DHCP (Cisco IOS Örneği):**  
+     Ayrı bir Linux makinesi yerine doğrudan omurga anahtarı üzerinde de DHCP çalıştırılabilir:
+     ```text
+     ! 1. Sabit IP'lerin dağıtılmasını engelle (Switch, Router ve Yazıcı IP'leri çakışmasın):
+     ip dhcp excluded-address 10.10.1.1 10.10.1.49
+
+     ! 2. Personel için DHCP Havuzu Oluştur:
+     ip dhcp pool VLAN10_PERSONEL
+      network 10.10.1.0 255.255.255.0              ! Dağıtılacak subnet
+      default-router 10.10.1.1                     ! Option 3: Gateway
+      dns-server 10.10.1.10 1.1.1.1                ! Option 6: DNS
+      domain-name sirket.local                     ! Option 15: Arama alanı
+      lease 0 8 0                                  ! Kira süresi: 0 gün, 8 saat, 0 dakika
+     ```
+
+   * **Kritik Soru: "DHCP Sunucusu Sistem Odasında (VLAN 50), Ahmet İse 2. Katta (VLAN 10). DHCP Paketi Katları Nasıl Aşar?"**  
+     > ⚠️ **Problem (Broadcast Engeli):** Ahmet'in bilgisayarı ilk açıldığında IP'si olmadığı için ağa bir **Broadcast (255.255.255.255)** fırlatır (`DHCP Discover`). Ancak router ve L3 switch'ler broadcast paketleri diğer VLAN'lara **kesinlikle geçirmez** (ağ çökmesin diye fırtınayı engeller). O halde sistem odasındaki DHCP sunucusu Ahmet'in çığlığını nasıl duyar?  
+     > 
+     > 🛠️ **Çözüm: DHCP Relay Agent (`ip helper-address`):**  
+     > IT mühendisi, Ahmet'in bağlı olduğu ağ geçidi arayüzüne (VLAN 10 SVI) şu tek satırlık sihirli komutu yazar:
+     > ```text
+     > interface Vlan10
+     >  description Personel_Agi_Gecidi
+     >  ip address 10.10.1.1 255.255.255.0
+     >  ip helper-address 10.50.1.10   # Ahmet'in broadcast DHCP çağrısını UNICAST'e çevirip sistem odasındaki DHCP sunucusuna postala!
+     > ```
+     > Switch broadcast gelen çağrıyı yakalar, içine *"Bu çağrı VLAN 10'dan geldi"* notunu ekler ve sistem odasındaki DHCP sunucusuna doğrudan Unicast IP paketi olarak iletir. DHCP sunucusu da bu nota bakarak doğru havuzdan (`10.10.1.0/24`) bir IP seçip geri gönderir.
 
 Artık altyapı hazırdır! Şimdi Ahmet ofise gelir ve masasına oturur...
 
@@ -763,12 +814,75 @@ Artık altyapı hazırdır! Şimdi Ahmet ofise gelir ve masasına oturur...
 
 #### 4. Aşama: Sunucu Odasında Karşılama ve Yük Dağıtımı (Reverse Proxy - Nginx / HAProxy)
 1. Paket sunucu odasındaki `10.20.1.50` adresine ulaşır. Ancak bu IP tek bir veritabanı veya backend makinesi değildir; kapıdaki **Reverse Proxy (Nginx)** sunucusudur.
-2. **SSL Termination:** Nginx, HTTPS şifrelemesini çözer ve gelen isteği kontrol eder.
-3. **Load Balancing (Yük Dengeleme):** Nginx'in arkasında çalışan 3 adet uygulama sunucusu vardır:
-   * 1. Sunucu: %90 CPU yükünde (Yoğun)
-   * 2. Sunucu: %15 CPU yükünde (Boşta)
-   * Nginx isteği boşta olan 2. sunucunun soketine (`10.20.1.62:3000`) aktarır.
-4. Muhasebe sayfası üretilir, Nginx üzerinden paket tekrar paketlenir, aynı yoldan Ahmet'in ekranına döner ve sayfa açılır!
+2. **Reverse Proxy Neden Konur ve IT/DevOps Mühendisi Nginx'i Nasıl Yapılandırır?**
+   * Şirketin arka plandaki yazılım mimarları muhasebe uygulamasını 3 farklı sunucuda (`10.20.1.61`, `10.20.1.62`, `10.20.1.63` port `3000`) çalıştırmaktadır.
+   * Nginx bu 3 sunucunun önüne bir kalkan, SSL sonlandırıcı ve akıllı bir trafik polisi gibi yerleştirilir.
+
+   * **Adım Adım Nginx Yapılandırma Dosyası (`/etc/nginx/conf.d/portal.conf`):**
+     ```nginx
+     # 1. Backend Sunucu Kümesi (Load Balancing Havuzu)
+     upstream muhasebe_cluster {
+         # Yük dengeleme algoritması: least_conn (En az aktif bağlantısı olan sunucuya gönder)
+         # (Varsayılan round-robin'dir; fakat kurumsal uygulamalarda least_conn veya ip_hash tercih edilir)
+         least_conn;
+
+         server 10.20.1.61:3000 max_fails=3 fail_timeout=10s;
+         server 10.20.1.62:3000 max_fails=3 fail_timeout=10s;
+         server 10.20.1.63:3000 max_fails=3 fail_timeout=10s backup; # İlk ikisi çökerse devreye girecek acil durum yedeği
+     }
+
+     # 2. HTTP Portu (80) - Otomatik Olarak Güvenli HTTPS'e (443) Yönlendirme (301 Redirect)
+     server {
+         listen 80;
+         server_name portal.sirket.local;
+
+         # Kullanıcı tarayıcıya sadece portal.sirket.local yazsa bile anında HTTPS'e fırlat:
+         return 301 https://$host$request_uri;
+     }
+
+     # 3. HTTPS Portu (443) - SSL Sonlandırma ve Ters Vekil (Reverse Proxy)
+     server {
+         listen 443 ssl http2;
+         server_name portal.sirket.local;
+
+         # SSL / TLS Sertifika Yapılandırması (Kurumsal İç CA Tarafından İmzalanmış Sertifika):
+         ssl_certificate     /etc/ssl/certs/sirket_portal.crt;
+         ssl_certificate_key /etc/ssl/private/sirket_portal.key;
+
+         # Güvenlik ve Şifreleme Standartları (Eski ve güvensiz protokolleri reddet):
+         ssl_protocols TLSv1.2 TLSv1.3;
+         ssl_ciphers HIGH:!aNULL:!MD5;
+         ssl_prefer_server_ciphers on;
+
+         # Ahmet'in İsteklerini Karşılayan ve Arkadaki Kümelere İleten Blok:
+         location / {
+             # Gelen isteği yukarıda tanımladığımız sunucu kümesine pasla:
+             proxy_pass http://muhasebe_cluster;
+
+             # ⚠️ KRİTİK PROXY BAŞLIKLARI (Header Forwarding):
+             proxy_set_header Host $host;                          # Orijinal alan adını koru (portal.sirket.local)
+             proxy_set_header X-Real-IP $remote_addr;              # Ahmet'in gerçek istemci IP'sini backend'e aktar (10.10.1.45)
+             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; # Varsa aradaki tüm proxy zincirini koru
+             proxy_set_header X-Forwarded-Proto $scheme;           # İsteğin HTTPS ile geldiğini backend'e bildir
+
+             # Zaman Aşımı (Timeout) Ayarları:
+             proxy_connect_timeout 5s;
+             proxy_read_timeout 60s;
+         }
+     }
+     ```
+
+   * 🔍 **"X-Real-IP ve X-Forwarded-For Neden Hayatidir? Bu Ayarlar Olmazsa Ne Olur?"**  
+     * Eğer IT uzmanı Nginx'e bu başlıkları eklemezse; Nginx isteği backend sunucusuna aktarırken TCP paketinin kaynak IP'si olarak **kendi IP'sini (`10.20.1.50`)** yazar.
+     * Backend muhasebe sunucusu gelen tüm istekleri Nginx yapıyormuş gibi görür!
+     * **Sonuç:** Ahmet muhasebede 1 milyon TL'lik bir para transferi onayladığında, veritabanındaki denetim (audit) logunda *"Bu işlemi kim yaptı?"* sorusunun cevabı olarak Ahmet'in IP'si (`10.10.1.45`) yerine Nginx'in IP'si görünürdü; adli bilişim ve güvenlik takibi imkansız hale gelirdi! İşte bu yüzden `X-Forwarded-For` başlığıyla Ahmet'in kimliği arka sunucuya taşınır.
+
+   * ⚡ **SSL Termination (SSL Sonlandırma) Neden Nginx'te Yapılır?**  
+     * HTTPS şifresini çözmek yoğun matematiksel işlem gücü (CPU) gerektirir.
+     * Nginx şifreyi çözer (SSL Termination) ve arkadaki 3 Node.js/Go/Java backend sunucusuna trafiği yalın HTTP üzerinden saniyede binlerce istek hızında dağıtır. Böylece backend sunucuları şifrelemeyle yorulmaz, sadece iş mantığına (muhasebe kodlarına) odaklanır.
+
+3. **Yük Dağıtımı:** Nginx'in arkasında çalışan sunuculardan `10.20.1.61` yoğun olduğundan, Nginx `least_conn` algoritması sayesinde Ahmet'in isteğini anında en müsait olan `10.20.1.62:3000` soketine aktarır.
+4. Muhasebe sayfası üretilir, Nginx üzerinden yanıt tekrar HTTPS ile paketlenip Ahmet'in tarayıcısına döner ve portal ekranı açılır!
 
 ---
 
