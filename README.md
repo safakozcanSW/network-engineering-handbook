@@ -124,12 +124,16 @@ Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik 
 * **Nedir:** Cihazların ağlar üzerinde mantıksal olarak konumlanmasını sağlayan, yönlendirilebilir 32-bit (IPv4) veya 128-bit (IPv6) adresleme protokolüdür.
 * **Kullanım Amacı:** OSI 3. Katmanda (Network) paketlerin farklı yerel ağlar ve internet omurgası üzerinden hedefe yönlendirilmesini (Routing) sağlar.
 * **IPv4 vs IPv6 (Neden Yeni Protokole Geçiyoruz?):**
-  * **IPv4 (32-bit):** Yaklaşık $2^{32} \approx 4.3$ milyar adres üretir. 2010'lu yıllarda küresel olarak tükenmiştir; bu nedenle NAT (Network Address Translation) gibi geçici yamalara muhtaç kalınmıştır.
-  * **IPv6 (128-bit):** Yaklaşık $2^{128} \approx 3.4 \times 10^{38}$ (trilyonlarca trilyon) adres üretir. Dünyadaki her kum tanesine binlerce IP verilebilecek büyüklüktedir. NAT zorunluluğunu ortadan kaldırır, her cihaz doğrudan genel internette uçtan uca (End-to-End) benzersiz bir IP alır; dahili IPSec desteği ve otomatik yapılandırma (SLAAC) sunar.
+  * **IPv4 (32-bit):** Yaklaşık $2^{32} \approx 4.3$ milyar adres üretir. 2010'lu yıllarda dünyadaki tüm IPv4 adresleri tükenmiştir. Bu açığı kapatabilmek için **NAT (Network Address Translation)** tekniği geliştirilmiştir.
+    > ℹ️ *NAT Nedir? Evinizdeki onlarca telefon ve bilgisayarın modem arkasına gizlenerek internete **tek bir ortak IP** üzerinden çıkmasını sağlayan adres çeviricisidir (Detayları [Modül 4 / Madde 10'da](#10-nat-network-address-translation) incelenecektir).*
+  * **IPv6 (128-bit):** Yaklaşık $2^{128} \approx 3.4 \times 10^{38}$ (trilyonlarca trilyon) adres üretir. Dünyadaki her kum tanesine binlerce IP verilebilecek büyüklüktedir. 
+    * **NAT Zorunluluğunu Kaldırır:** Her cihaz doğrudan genel internette uçtan uca (*End-to-End*) benzersiz bir küresel IP alabilir.
+    * **Dahili Güvenlik:** Veri şifreleme standardı olan **IPsec** doğrudan protokolün içine gömülüdür.
+    * **Otomatik Yapılandırma (SLAAC):** Cihazlar ağa takıldığında bir DHCP sunucusuna dahi ihtiyaç duymadan kendi IP adreslerini otomatik olarak türetebilir (*Stateless Address Autoconfiguration*).
 * **Temel IP Blokları ve Sınıflandırma:**
-  * **Public IP (Genel):** İnternette yönlendirilebilen, ICANN/RIPE tarafından ISP'lere ve kuruluşlara tahsis edilen küresel IP'lerdir.
-  * **Private IP (Özel - RFC 1918):** İnternete doğrudan çıkamayan, yerel ağlara ayrılmış bloklardır:
-    * `10.0.0.0/8` (Büyük kurumsal yapılar)
+  * **Public IP (Genel):** İnternette yönlendirilebilen, ICANN/RIPE gibi uluslararası kurumlar tarafından ISP'lere ve şirketlere tahsis edilen küresel IP'lerdir.
+  * **Private IP (Özel - RFC 1918):** İnternete doğrudan çıkamayan, ev ve şirket içi yerel ağlara ayrılmış bloklardır (*RFC: İnternet standartlarını belirleyen resmi teknik şartnamelerdir*):
+    * `10.0.0.0/8` (Büyük kurumsal yapılar ve veri merkezleri)
     * `172.16.0.0/12` (Orta ölçekli ağlar / Docker container ağları)
     * `192.168.0.0/16` (Ev ve küçük ofis ağları)
   * **Loopback IP (`127.0.0.1` / `::1`):** Cihazın kendi yerel TCP/IP yığınını test eden ve dışarıya paket çıkarmadan yerel servislere bağlanmayı sağlayan adrestir.
@@ -138,7 +142,7 @@ Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik 
   > 💡 **Analoji:** MAC kimlik kartıysa, IP adresi **evinizin posta adresidir**. Şehir veya sokak değiştirdiğinizde (başka kafeye veya ağa bağlandığınızda) posta adresiniz değişir. Evdeki akıllı ampulün telefon uygulaması üzerinden açılıp kapanması yerel IP (`192.168.1.45`) üzerinden yürür.
 * **Alternatif Kullanım Amaçları ve Örnekleri:**
   * **Coğrafi Engellemeler ve Hak Yönetimi:** Netflix, Steam vb. servisler kullanıcının Public IP adresine bakarak (GeoIP) bulunduğu ülkeyi belirler, telif haklarına göre içerik kütüphanesini ve fiyatlandırmayı sınırlar.
-  * **Anycast IP Dağıtımı:** Tek bir IP adresi (örn. Cloudflare `1.1.1.1` veya Google `8.8.8.8`) dünyanın 200'den fazla farklı veri merkezinde aynı anda anons edilir (BGP Anycast). Kullanıcı bu IP'ye istek attığında internet yönlendirme algoritmaları isteği fiziksel olarak en yakın veri merkezine uçurur.
+  * **Anycast IP Dağıtımı:** Tek bir IP adresi (örn. Cloudflare `1.1.1.1` veya Google `8.8.8.8`) dünyanın 200'den fazla farklı veri merkezinde aynı anda anons edilir (*BGP: İnternet omurgasındaki ISP'lerin yönlendirme harita protokolüdür; Anycast ise aynı IP'nin dünyanın birden çok yerinde aynı anda bulunabilmesidir*). Kullanıcı bu IP'ye istek attığında istek fiziksel olarak en yakın veri merkezine uçurulur.
   * **Yazılım Geliştirme İzolasyonu (Loopback):** Bilgisayarda geliştirilen bir API servisi (`localhost:3000`), internet bağlantısı olmasa bile `127.0.0.1` üzerinden güvenle test edilir.
 
 ---
@@ -208,7 +212,7 @@ Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik 
 * **Gündelik Hayatta Karşılığı:**  
   > 💡 **Analoji:** Evinizin **dış kapısı** veya sitenin **güvenlik nizamiye kapısıdır**. Evin odaları arasında gezerken kapıdan çıkmazsınız; ancak markete gitmek veya başka bir şehre seyahat etmek istediğinizde tek çıkış yolunuz o kapıdır.
 * **Alternatif Kullanım Amaçları ve Örnekleri:**
-  * **Yedekli Ağ Geçidi Protokolleri (HSRP / VRRP):** Finans kurumlarında veya veri merkezlerinde iki ayrı fiziksel router bulunur. Bu cihazlar ortak bir *"Sanal Gateway IP'si"* tanımlar. Birinci router donanımsal arıza yaşasa bile saniyeler içinde yedek router görevi devralır; istemciler kesinti hissetmez.
+  * **Yedekli Ağ Geçidi Protokolleri (HSRP / VRRP):** Finans kurumlarında veya veri merkezlerinde iki ayrı fiziksel router bulunur. Bu cihazlar ortak bir *"Sanal Gateway IP'si"* tanımlar (*HSRP / VRRP: İki ayrı fiziksel router'ın tek bir sanal ağ geçidi gibi çalışmasını sağlayarak biri bozulduğunda diğerinin milisaniyeler içinde internet çıkışını devralmasını sağlayan protokollerdir*). Birinci router yansa bile kullanıcıların interneti kesilmez.
   * **Policy-Based Routing (PBR / Çoklu İnternet Çıkışı):** Şirkette biri fiber, diğeri LTE iki hat varken yönlendirici yapılandırılarak kritik muhasebe trafiği fiber gateway'e, misafir Wi-Fi trafiği ise LTE gateway'e sevk edilebilir.
 
 ---
@@ -257,23 +261,23 @@ Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik 
   * **Scope / IP Pool:** Dağıtılacak IP adres aralığı (örn. `192.168.1.50 - 192.168.1.200`).
   * **Lease Time (Kira Süresi):** IP adresinin istemciye tahsis edilme süresi.
   * **DHCP Options:**
-    * *Option 3:* Default Gateway
+    * *Option 3:* Default Gateway (Varsayılan Ağ Geçidi)
     * *Option 6:* DNS Sunucuları
     * *Option 15:* Domain Name (Yerel arama soneki)
-    * *Option 66 / 67:* PXE Boot TFTP sunucu IP'si ve boot dosyası adı
-    * *Option 150:* VoIP PBX Sunucu IP'si
+    * *Option 66 / 67 (PXE Boot):* Ağdan işletim sistemi kurmak için gereken TFTP sunucu IP'si ve önyükleme dosyası adı (*PXE: Bilgisayarın hard disk olmadan ağ kartından açılmasıdır; TFTP ise küçük ve şifresiz hızlı dosya indirme protokolüdür*).
+    * *Option 150 (VoIP):* IP telefonların santral profillerini çekeceği çağrı santralinin (*PBX: Şirket içi telefon santrali*) IP adresi.
   * **DHCP Relay Agent:** Farklı VLAN'lardaki istemcilerin tek bir merkezi DHCP sunucusundan IP alabilmesi için router üzerinde tanımlanan aktarıcıdır (ip helper-address).
 * **Gündelik Hayatta Karşılığı:**  
   > 💡 **Analoji:** Bir otele giriş yaptığınızda resepsiyon görevlisinin size **oda anahtarı, otel kuralları kitapçığı ve Wi-Fi şifresi** vermesidir. Otelden ayrıldığınızda o oda başkasına tahsis edilir.
 * **Alternatif Kullanım Amaçları ve Örnekleri:**
-  * **Ağdan Otomatik Kurulum (PXE Boot):** Yüzlerce istemci bilgisayara USB bellek olmadan işletim sistemi kurmak için DHCP Option 66 ve 67 yapılandırılır. Bilgisayarlar açılır açılmaz ağdan işletim sistemi imajını indirip otomatik yükleme yapar.
-  * **IP Telefon (VoIP) Provizyonu:** Masalardaki IP telefonlar ağa bağlandığında DHCP Option 150 ile santral adresini öğrenir; kullanıcı adı, şifre ve hat ayarlarını santralden otomatik çekerek kullanıma hazır hale gelir.
+  * **Ağdan Otomatik Kurulum (PXE Boot):** Yüzlerce istemci bilgisayara tek tek USB takıp format atmak yerine, DHCP Option 66 ve 67 ile makineler açılır açılmaz ağdan işletim sistemi imajını indirip otomatik yükleme yapar.
+  * **IP Telefon (VoIP) Provizyonu:** Masalardaki IP telefonlar ağa bağlandığında DHCP Option 150 ile santral adresini öğrenir; kullanıcı profillerini otomatik yükleyerek kullanıma hazır hale gelir.
 
 ---
 
 ### 7. DNS (Domain Name System)
 
-* **Nedir:** İnsanların okuyabildiği alan adlarını (FQDN: `ornek.com`) bilgisayarların anladığı sayısal IP adreslerine (`93.184.216.34`) dönüştüren küresel, dağıtık veritabanıdır (Port 53 UDP/TCP).
+* **Nedir:** İnsanların okuyabildiği alan adlarını (FQDN: `ornek.com` — *Fully Qualified Domain Name: Noktası virgülüne eksiksiz tanımlanmış alan adı*) bilgisayarların anladığı sayısal IP adreslerine (`93.184.216.34`) dönüştüren küresel, dağıtık veritabanıdır (Port 53 UDP/TCP).
 * **Kritik DNS Kayıt Türleri:**
   | Kayıt | Görevi | Örnek Değer |
   | :--- | :--- | :--- |
@@ -337,7 +341,7 @@ graph TD
   * **TCP:** **İadeli taahhütlü mektuptur.** Alıcı teslim aldığına dair imza atar; posta yolda kaybolursa postane aynısını tekrar ulaştırır.
   * **UDP:** **Canlı stadyum anonsu veya radyo yayınıdır.** O an bir kelimeyi kaçırırsanız yayın durup tekrar etmez, akış kesilmeden devam eder.
 * **Alternatif Kullanım Amaçları ve Örnekleri:**
-  * **QUIC Protokolü (HTTP/3):** Google ve Cloudflare öncülüğünde geliştirilen modern web standardı; TCP'nin bağlantı gecikmelerini (Handshake) ve hat başı tıkanmalarını (Head-of-Line Blocking) aşmak için UDP üzerinde şifreli ve güvenilir yeni bir taşıma katmanı kurmuştur. Modern tarayıcılar HTTPS trafiğini artık UDP 443 üzerinden çekmektedir.
+  * **QUIC Protokolü (HTTP/3):** Google ve Cloudflare öncülüğünde geliştirilen modern web standardı; TCP'nin bağlantı gecikmelerini (Handshake) ve hat başı tıkanmalarını (*Head-of-Line Blocking: TCP'de yolda kaybolan tek bir paket tekrar iletilip onaylanana kadar arkasındaki tüm veri akışının kilitlenip beklemesi sorunu*) aşmak için UDP üzerinde şifreli ve güvenilir yeni bir taşıma katmanı kurmuştur. Modern tarayıcılar HTTPS trafiğini artık UDP 443 üzerinden çekmektedir.
   * **Yoğun Log İletimi (Syslog UDP 514):** Saniyede yüz binlerce log satırı üreten sunucularda diskin veya uygulamanın kilitlenmemesi için loglar UDP üzerinden *"fire-and-forget"* mantığıyla log sunucusuna basılır; birkaç satır kaybolsa bile ana sistemin çalışması aksamaz.
 
 ---
@@ -399,7 +403,7 @@ graph TD
   > 💡 **Analoji:** Bir plazadaki **tek bir asansör kabininin** hem normal çalışanlar hem de kartını okutan VIP yöneticiler tarafından kullanılmasıdır. Aynı fiziksel ray kullanılır ancak çalışanlar VIP kata basamaz veya o kattaki odalara erişemez.
 * **Alternatif Kullanım Amaçları ve Örnekleri:**
   * **Ev ve KOBİ Ağlarında IoT İzolasyonu:** Güvenlik açığı barındırabilecek akıllı süpürgeler, IP kameralar veya ampuller için `VLAN 20 (IoT)` tanımlanır. Bu cihazlar internete çıkabilir ancak evdeki bilgisayarların ve kişisel verileri tutan NAS depolama cihazının bulunduğu `VLAN 10` ağına kesinlikle erişemez.
-  * **Sanallaştırma Altyapısı (VMware ESXi / Proxmox / KVM):** Sunucuya bağlı tek bir 10G fiziksel hat (Trunk Port), üzerinde 50 farklı VLAN taşır. Sanal makinelerin sanal ağ kartları (vNIC) doğrudan bu VLAN ID'lerine bağlanarak tamamen yalıtılmış DMZ, Uygulama ve Veritabanı katmanları kurulur.
+  * **Sanallaştırma Altyapısı (VMware ESXi / Proxmox / KVM):** Sunucuya bağlı tek bir 10G fiziksel hat (Trunk Port), üzerinde 50 farklı VLAN taşır. Sanal makinelerin sanal ağ kartları (vNIC) doğrudan bu VLAN ID'lerine bağlanarak tamamen yalıtılmış DMZ (*Demilitarized Zone — Web sunucuları gibi dışa açık servislerin konulduğu ancak iç ağdaki hassas veritabanlarından izole edilmiş güvenli ara bölge*), Uygulama ve Veritabanı katmanları kurulur.
 
 ---
 
@@ -476,7 +480,7 @@ graph LR
   * **Reverse Proxy:** Büyük bir holdingin **çağrı merkezi santralidir**; müşteri tek bir numarayı arar, santral arkadaki 50 müşteri temsilcisinden boşta olanına bağlar. Müşteri personelin dahili numarasını bilmez.
 * **Alternatif Kullanım Amaçları ve Örnekleri:**
   * **Web Scraping ve Fiyat Takibi (Rotating Residential Proxy):** E-ticaret sitelerinden piyasa fiyatı toplayan botlar bot engellerine takılmamak için binlerce konut IP proxy havuzu üzerinden her istekte farklı vekil sunucu kullanarak veri çeker.
-  * **SSL Termination ve Zero-Downtime Deployment:** Backend sunucularına binen HTTPS şifreleme ve çözme yükü Nginx üzerine alınır; Node.js/Python/Go servisleri saf HTTP ile rahat çalışır. Versiyon güncellemelerinde Nginx trafiği sırayla sunuculara yönlendirerek kesintisiz geçiş (Blue-Green Deployment) sağlar.
+  * **SSL Termination ve Zero-Downtime Deployment:** Backend sunucularına binen HTTPS şifreleme ve çözme yükü Nginx üzerine alınır; Node.js/Python/Go servisleri saf HTTP ile rahat çalışır. Versiyon güncellemelerinde Nginx trafiği sırayla sunuculara yönlendirerek kesintisiz geçiş sağlar (*Blue-Green Deployment: Eski sürüm [Mavi] çalışırken yeni sürümün [Yeşil] arka planda hazır edilip trafiğin anında yeni sürüme aktarılmasıyla sıfır kesinti sağlayan güncelleme yöntemidir*).
 
 ---
 
