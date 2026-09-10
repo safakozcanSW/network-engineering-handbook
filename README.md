@@ -58,7 +58,13 @@ Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik 
 
 * **Nedir:** Ağ Arayüz Kartının (NIC) üretici tarafından donanıma kazınmış fiziksel ve benzersiz 48-bit (6 oktet) kimliğidir.  
   * *Format Örneği:* `52:54:00:12:34:56` (İlk 3 oktet `OUI` üretici kodu, son 3 oktet benzersiz cihaz seri no'sudur).
-* **Kullanım Amacı:** OSI 2. Katmanda (Data Link) aynı yerel ağ (LAN) içindeki switch'lerin paketleri hedef cihazın portuna doğru anahtarlaması için kullanılır.
+* **Kullanım Amacı:** OSI 2. Katmanda (Data Link) aynı yerel ağ (LAN) içindeki switch'lerin paketleri hedef cihazın portuna doğru anahtarlaması (switching) için kullanılır.
+  * *Basit PC Örneği:* Aynı switch'e kabloyla bağlı 3 bilgisayar düşünelim:
+    * **PC-1 (Port 1'e takılı):** MAC: `AA:AA:AA:AA:AA:AA`
+    * **PC-2 (Port 2'ye takılı):** MAC: `BB:BB:BB:BB:BB:BB`
+    * **PC-3 (Port 3'e takılı):** MAC: `CC:CC:CC:CC:CC:CC`
+
+    PC-1, PC-2'ye yerel ağdan bir dosya göndermek istediğinde, paketin Ethernet çerçevesindeki "Hedef MAC" kısmına PC-2'nin adresi olan `BB:BB:BB:BB:BB:BB` yazılır. Paket switch'e ulaştığında switch kendi hafızasındaki **MAC Tablosuna (CAM Table)** bakar ve bu adresin **Port 2**'de olduğunu görür. Paketi gereksiz yere PC-3'e göndermez; **doğrudan ve yalnızca Port 2'ye iletir**. Böylece ağ trafiği boğulmaz ve güvenli bir iletim sağlanır.
 * **Ayar, Değiştirme & Sabitleme Mekanizmaları:**
   * **İşletim Sistemi Seviyesinde Geçici Değiştirme (MAC Spoofing):**  
     Fiziksel donanımdaki kalıcı fabrika çıkış adresine (BIA - *Burned-in Address*) dokunulmaz; işletim sistemi çekirdeğindeki sanal ağ yığınında geçici olarak ezilir (override):
