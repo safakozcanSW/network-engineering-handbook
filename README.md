@@ -653,9 +653,37 @@ Ahmet sabah ofise gelip kabloyu takmadan **önce**, şirketin IT (Bilgi İşlem)
      > *(Not: Küçük işletmeler veya bulut ortamlarında bu işlem pfSense, OPNsense veya AWS Security Group gibi **yazılımsal firewall** olarak da çalıştırılabilir).*
    * **Neden Tek Modem Yetmez?** Ev tipi küçük bir modem yüzlerce bilgisayarın bağlantısını ve güvenliğini kaldıramaz, hemen kilitlenir; bu yüzden modem yalnızca yukarıda anlattığımız gibi bir dönüştürücü olarak kalır, asıl yükü bu donanımsal Firewall kutusu ve Core Switch üstlenir.
 2. **Omurga (Core Switch) ve Kenar Anahtarların (Access Switch) Yerleşimi:**
-   * **Sistem Odası (Merkez):** Modemin hemen arkasına yüksek hızlı, ana omurga anahtarı (**Core Switch**) konur.
+   * **Sistem Odası (Merkez):** Modemin ve Firewall'un hemen arkasına yüksek hızlı, ana omurga anahtarı (**Core Switch**) konur.
    * **Katlar (Kenar Noktalar):** Her kata birer adet **Kenar Anahtar (Access Switch)** yerleştirilir (Örn: 2. Kat Switch'i, 3. Kat Switch'i).
-   * **Bağlantı (Trunk Hat):** Sistem odasındaki Core Switch ile katlardaki Access Switch'ler arasına tek bir yüksek hızlı fiber kablo çekilir ve bu portlar **Trunk (802.1Q)** olarak yapılandırılır (böylece tüm VLAN etiketleri tek kablodan akabilir).
+   * **Bağlantı (Trunk Hat - IEEE 802.1Q):**
+     * > 🔀 **"Trunk Hat Tam Olarak Nedir ve Neden Hayat Kurtarır?"**  
+       > **Büyük Problem (Trunk Olmasaydı Ne Olurdu?):**  
+       > Diyelim ki 2. katta 3 farklı departman/ağ var:
+       > 1. `VLAN 10` (Personel Ağı)
+       > 2. `VLAN 20` (Yöneticiler Ağı)
+       > 3. `VLAN 99` (Misafir Wi-Fi Ağı)  
+       > 
+       > Eğer Trunk teknolojisi olmasaydı; 2. kattaki switch'ten bodrumdaki sistem odasına **her bir VLAN için ayrı ayrı 3 farklı kalın kablo çekmek zorunda kalırdınız!** Şirkette 20 tane VLAN olsaydı, katlar arasında borulardan geçen 20 tane kablo kirliliği ve switch portu israfı olurdu.  
+       > 
+       > **Çözüm (Trunk Mantığı):**  
+       > IT mühendisi, katlar arasına **tek bir adet yüksek hızlı fiber kablo** çeker ve kablonun takıldığı iki ucu da **Trunk Port** olarak ayarlar:
+       > ```text
+       > interface GigabitEthernet0/1
+       >  switchport mode trunk
+       >  switchport trunk allowed vlan 10,20,99   # Tek kablodan bu 3 VLAN'ın da geçmesine izin ver
+       > ```
+       > 
+       > 🏷️ **802.1Q Etiketleme (Renkli Zarflar Mantığı):**  
+       > Tek bir kablodan hem misafirin hem personelin hem yöneticinin verisi nasıl birbirine karışmadan akar?  
+       > * Ahmet (VLAN 10) bir dosya gönderdiğinde, 2. kattaki switch bu paketin Ethernet çerçevesinin içine **4 baytlık küçük bir etiket (802.1Q Tag: `VLAN ID = 10`)** yapıştırır.
+       > * Yan masadaki misafir internete çıktığında onun paketine de **`VLAN ID = 99`** etiketi yapıştırılır.
+       > * Bu paketler tek bir fiber kablodan arka arkaya akar.
+       > * Paketler bodrumdaki **Core Switch**'e ulaştığı anda, Core Switch gelen paketin üzerindeki etikete bakar:
+       >   * *"Aha, bunun üzerinde `10` etiketi var, bunu personelin yönlendiricisine atayım."*
+       >   * *"Bunun üzerinde `99` var, bunu misafir ağına yönlendireyim."*  
+       > * Core Switch etiketi söker ve paketi ait olduğu hedefe teslim eder.  
+       > 
+       > 💡 **Özet Analoji:** Trunk hat, aynı tünelden geçen tren vagonları gibidir. Her vagonun üzerinde ait olduğu firmanın logosu (VLAN ID) vardır; tek bir raydan akarlar ama istasyona vardıklarında herkes kendi peronuna ayrılır.
 3. **Masa Prizlerinin Kenar Switch'e Bağlanması:**
    * IT personeli duvarlardan patch panel üzerinden her masaya birer ethernet prizi çeker.
    * Ahmet'in oturduğu 12 numaralı masadan gelen kablo, kenar switch'in **Port 5**'ine takılır.
