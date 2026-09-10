@@ -59,13 +59,44 @@ Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik 
 * **Nedir:** Ağ Arayüz Kartının (NIC) üretici tarafından donanıma kazınmış fiziksel ve benzersiz 48-bit (6 oktet) kimliğidir.  
   * *Format Örneği:* `52:54:00:12:34:56` (İlk 3 oktet `OUI` üretici kodu, son 3 oktet benzersiz cihaz seri no'sudur).
 * **Kullanım Amacı:** OSI 2. Katmanda (Data Link) aynı yerel ağ (LAN) içindeki switch'lerin paketleri hedef cihazın portuna doğru anahtarlaması için kullanılır.
-* **Ayar & Parametre:**
-  ```bash
-  # Linux ağ kartı MAC adresini görüntüleme veya değiştirme
-  ip link show eth0
-  ip link set dev eth0 address 00:11:22:33:44:55
-  ```
-  Sanal makine XML tanımlarında (KVM/libvirt) veya sanallaştırma araçlarında statik MAC ataması yapılarak DHCP rezervasyonu güvenceye alınır.
+* **Ayar, Değiştirme & Sabitleme Mekanizmaları:**
+  * **İşletim Sistemi Seviyesinde Geçici Değiştirme (MAC Spoofing):**  
+    Fiziksel donanımdaki kalıcı fabrika çıkış adresine (BIA - *Burned-in Address*) dokunulmaz; işletim sistemi çekirdeğindeki sanal ağ yığınında geçici olarak ezilir (override):
+    ```bash
+    # Mevcut MAC adresini ve arayüz durumunu görüntüleme
+    ip link show eth0
+
+    # Arayüzü durdur, adresi değiştir ve tekrar ayağa kaldır (MAC Spoofing)
+    sudo ip link set dev eth0 down
+    sudo ip link set dev eth0 address 00:11:22:33:44:55
+    sudo ip link set dev eth0 up
+    ```
+  * **Sanal Makinelerde (KVM/libvirt/VMware) MAC Sabitleme ve Değiştirme:**  
+    Sanal makinelerde gerçek bir fiziksel ağ kartı yoktur; hipervizör (hypervisor) işletim sistemine sanal bir kart (**vNIC**) emüle eder. Eğer sanal makine oluşturulurken MAC elle atanmazsa, hipervizör rastgele bir MAC adresi türetir. Klonlanan veya yeniden oluşturulan sanal makinelerin her seferinde aynı kimliğe sahip olması için XML yapılandırma dosyasında MAC **sabitlenir**.
+    
+    *KVM/libvirt XML Örneği (`virsh edit <vm_adi>`):*
+    ```xml
+    <devices>
+      <interface type='network'>
+        <!-- Sanal makinenin sabit donanımsal kimliği -->
+        <mac address='52:54:00:1a:2b:3c'/>
+        <source network='default'/>
+        <model type='virtio'/>
+      </interface>
+    </devices>
+    ```
+    > 🏷️ **Hipervizör OUI Standartları:** Sanal makineler üretilirken çakışmaları önlemek için özel üretici önekleri kullanılır:
+    > - **KVM / QEMU:** `52:54:00:xx:xx:xx`
+    > - **VMware ESXi/Workstation:** `00:50:56:xx:xx:xx` veya `00:0c:29:xx:xx:xx`
+    > - **Oracle VirtualBox:** `08:00:27:xx:xx:xx`
+
+  * **DHCP Rezervasyonu Nasıl Güvenceye Alınır? (Mantık Zinciri):**
+    1. **Sabit Sanal Donanım:** Yukarıdaki XML yapılandırmasıyla sanal sunucunun MAC adresi `52:54:00:1a:2b:3c` olarak sabitlenir (VM silinip yeniden deploy edilse dahi bu XML şablonu aynı MAC'i verir).
+    2. **DHCP Sunucusu Eşleştirmesi (Static Lease / Host Reservation):** Ağdaki DHCP sunucusunda (örneğin Router, Pfsense veya `dnsmasq`) şu kural tanımlanır:
+       ```text
+       Eğer gelen istek MAC: 52:54:00:1a:2b:3c ise -> Her zaman 192.168.1.100 IP'sini ata.
+       ```
+    3. **Avantajı:** Sanal makinenin içine girip işletim sisteminde tek tek statik IP (`netplan`, `ifcfg` vb.) tanımlamaya gerek kalmaz. Makine formatlansa veya yeniden kurulsa dahi, açılır açılmaz DHCP'den aynı rezerve IP'yi çeker. Böylece veritabanı veya web sunucusu IP adresini asla kaybetmez; DNS ve Firewall kuralları kesintiye uğramaz.
 * **Gündelik Hayatta Karşılığı:**  
   > 💡 **Analoji:** Bir insanın **T.C. Kimlik Numarası** gibidir; kişi nereye taşınırsa taşınsın bu kimlik sabittir. Evdeki Wi-Fi modeminizde *"MAC Filtreleme"* açarak sadece evdeki cihazların MAC adreslerine izin vermek ve komşunuz şifreyi bilse dahi ağa girmesini engellemek en tipik örneğidir.
 * **Alternatif Kullanım Amaçları ve Örnekleri:**
