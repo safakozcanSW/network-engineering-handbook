@@ -624,14 +624,50 @@ Tüm bu rehber boyunca öğrendiğimiz 14 temel ağ kavramının kurumsal bir of
 
 ### 📖 Adım Adım Temel Akış (Ofis Masasından Şirket İçi Portala Erişim)
 
+#### 0. Aşama: Sahne Arkası — IT Mühendisi Bu Ağı Nasıl Kurdu? (Altyapı, Switch ve DHCP Ayarları)
+Ahmet sabah ofise gelip kabloyu takmadan **önce**, şirketin IT (Bilgi İşlem) mühendisi bu yapıyı sıfırdan adım adım şu mantıkla kurmuştur:
+
+1. **İnternet Girişi ve Tek Ana Modem/Router Konumu:**
+   * IT çalışanı, servis sağlayıcıdan (ISP) gelen kurumsal fiber kabloyu sistem odasındaki ana modeme / kenar yönlendiriciye (Edge Router / Firewall) bağlar.
+   * Dış dünyadan gelen internet tek bir genel (Public) IP'dir. Ancak bina 4 katlıdır ve içeride yüzlerce bilgisayar olacaktır. Tek bir modem tüm binaya yetişemez; bu yüzden modem yalnızca interneti içeri sokan bir "dış kapı" görevi görür.
+2. **Omurga (Core Switch) ve Kenar Anahtarların (Access Switch) Yerleşimi:**
+   * **Sistem Odası (Merkez):** Modemin hemen arkasına yüksek hızlı, ana omurga anahtarı (**Core Switch**) konur.
+   * **Katlar (Kenar Noktalar):** Her kata birer adet **Kenar Anahtar (Access Switch)** yerleştirilir (Örn: 2. Kat Switch'i, 3. Kat Switch'i).
+   * **Bağlantı (Trunk Hat):** Sistem odasındaki Core Switch ile katlardaki Access Switch'ler arasına tek bir yüksek hızlı fiber kablo çekilir ve bu portlar **Trunk (802.1Q)** olarak yapılandırılır (böylece tüm VLAN etiketleri tek kablodan akabilir).
+3. **Masa Prizlerinin Kenar Switch'e Bağlanması:**
+   * IT personeli duvarlardan patch panel üzerinden her masaya birer ethernet prizi çeker.
+   * Ahmet'in oturduğu 12 numaralı masadan gelen kablo, kenar switch'in **Port 5**'ine takılır.
+   * IT uzmanı switch'in yönetim paneline (CLI) girip şu komutla o portu personelin ağına kilitler:
+     ```text
+     interface GigabitEthernet0/5
+      switchport mode access
+      switchport access vlan 10   # Port 5 artık sadece VLAN 10 (Personel) paketlerini geçirir
+     ```
+4. **DHCP Sunucusunun Kurulması ve Yapılandırılması:**
+   * IT uzmanı her bilgisayara gidip tek tek elle IP yazmamak için sistem odasında bir DHCP sunucusu kurar (örneğin bir Linux sunucuda `isc-dhcp-server`, Windows Server üzerinde DHCP rolü veya doğrudan Core Switch/Router üzerinde):
+   * **DHCP Havuzu (Scope) Tanımı:**
+     ```text
+     Ağ Bloğu: 10.10.1.0 /24 (255.255.255.0)
+     Dağıtılacak IP Havuzu: 10.10.1.50 - 10.10.1.200 (Personel için dinamik IP'ler)
+     Ayrılan Sabit IP'ler: 10.10.1.1 - 10.10.1.49 (Yazıcılar, switch'ler ve sunucular için)
+     Default Gateway (Option 3): 10.10.1.1 (Core Switch IP'si)
+     DNS Sunucusu (Option 6): 10.10.1.10 (Şirket içi DNS)
+     Kira Süresi (Lease Time): 8 Saat (Mesai bitiminde IP boşa çıksın)
+     ```
+   * **DHCP Relay (ip helper-address):** DHCP sunucusu sistem odasında (VLAN 50'de) dursa bile, katlardaki switch ve router'lara `ip helper-address 10.50.1.10` yazılarak personelin attığı broadcast çağrılarının doğrudan bu sunucuya yönlendirilmesi sağlanır.
+
+Artık altyapı hazırdır! Şimdi Ahmet ofise gelir ve masasına oturur...
+
+---
+
 #### 1. Aşama: Masaya Kabloyu Takma ve Kimlik Alma (Switch Portu, VLAN ve DHCP)
 1. **Fiziksel Bağlantı:** Ahmet Ethernet kablosunu bilgisayarına taktığı anda ağ kartı (NIC) ile duvardaki prizin bağlı olduğu **kenar switch (Access Switch)** arasında Katman 1/2 seviyesinde elektrik sinyalleri başlar.
-2. **VLAN Ataması:** Switch portu önceden tanımlanmıştır; Ahmet'in portu **`VLAN 10 (Personel Ağı)`** Access portudur.
-3. **Otomatik Yapılandırma (DHCP DORA):** Ahmet'in bilgisayarında henüz bir IP yoktur. Bilgisayar ağa *"Ben buradayım, bana IP verin"* çağrısı yapar.
-   * Şirketin merkezi DHCP sunucusu (veya Active Directory) Ahmet'e şu bilgileri teslim eder:
-     * **Atanan IP:** `10.10.1.45` (VLAN 10 bloğundan)
-     * **Subnet Mask:** `255.255.255.0` (`/24`)
-     * **Default Gateway:** `10.10.1.1` (Ofis katının ana yönlendiricisi / Core Switch)
+2. **VLAN Ataması:** IT uzmanının yukarıda yaptığı ayar sayesinde Ahmet'in portu donanım seviyesinde **`VLAN 10 (Personel Ağı)`** Access portudur.
+3. **Otomatik Yapılandırma (DHCP DORA):** Ahmet'in bilgisayarında henüz bir IP yoktur. Bilgisayar ağa *"Ben buradayım, bana IP verin"* çağrısı yapar (DHCP Discover).
+   * IT uzmanının kurduğu DHCP sunucusu Ahmet'e şu bilgileri teslim eder:
+     * **Atanan IP:** `10.10.1.45` (VLAN 10 havuzundan boşta olan bir IP)
+     * **Subnet Mask (Alt Ağ Maskesi):** `255.255.255.0` (`/24`)
+     * **Default Gateway (Varsayılan Ağ Geçidi):** `10.10.1.1` (Ofis katının ana yönlendiricisi / Core Switch)
      * **DNS Sunucuları:** `10.10.1.10` (Şirket içi DNS)
 
 #### 2. Aşama: "portal.sirket.local Nerede?" (Şirket İçi DNS Çözümleme)
