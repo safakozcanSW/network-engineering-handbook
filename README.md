@@ -149,49 +149,79 @@ Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik 
 
 ### 3. Subnet Mask (Alt Ağ Maskesi) & CIDR
 
-* **Nedir:** Bir IP adresinin hangi bitlerinin **Ağ Kimliğini (Network ID)**, hangi bitlerinin ise **Cihaz Kimliğini (Host ID)** temsil ettiğini belirten bit dizisidir (Örnek: `255.255.255.0` veya CIDR gösterimi ile `/24`).
-* **Kullanım Amacı:** Büyük ağları mantıksal alt parçalara bölerek (Subnetting) yayın (broadcast) fırtınalarını engellemek, ağ trafiğini yalıtmak ve sınırlı IPv4 havuzundaki israfı önlemek.
-* **Kritik Parametreler:**
-  * **Network Adresi:** Bir alt ağın ilk adresidir; ağın kendisini tanımlar ve cihazlara atanamaz (Örnek: `192.168.1.0/24`).
-  * **Broadcast Adresi:** Alt ağın en son adresidir; o alt ağdaki tüm cihazlara aynı anda paket göndermek için kullanılır (Örnek: `192.168.1.255/24`).
-  * **Kullanılabilir Host Sayısı:** Formül: $2^{(32 - CIDR)} - 2$ (Network ve Broadcast adresleri düşülür).
-* **Gündelik Hayatta Karşılığı:**  
-  > 💡 **Analoji:** Bir sitenin **blok ve daire numarası** ayrımıdır. Adresiniz *"A Blok No: 5"* ise, maske size kimin sizinle aynı blokta (aynı yerel ağda) olduğunu, kimin yan blokta oturduğunu söyler. Yan bloktakine seslenmek için site güvenlik kapısına (Gateway) gitmeniz gerekir.
-* **Alternatif Kullanım Amaçları ve Örnekleri:**
-  * **Bulut Altyapısı Güvenlik Mimarisi (AWS VPC / GCP) — Derinlemesine İnceleme:**  
-    Kurumsal bulut mimarilerinde çok katmanlı (**3-Tier Architecture: Web - App - Database**) güvenlik tasarımı alt ağların (Subnetting) doğru izole edilmesine dayanır:
-    
-    ```text
-    [ İNTERNET ] 
-         │ 
-         ▼ (Port 80 / 443)
-    ┌───────────────────────────────────────────────────────────┐
-    │ Public Subnet: 10.0.1.0/24 (Internet Gateway - IGW Açık)  │
-    │ └─► Web Sunucuları / Load Balancer (Public IP var)        │
-    └─────────────────────────────┬─────────────────────────────┘
-                                  │ (Yalnızca Port 5432 - Dahili İletişim)
-                                  ▼
-    ┌───────────────────────────────────────────────────────────┐
-    │ Private Subnet: 10.0.2.0/28 (Dış Dünyaya Tamamen Kapalı)  │
-    │ └─► PostgreSQL Veritabanı Kümesi (Yalnızca Private IP)    │
-    └───────────────────────────────────────────────────────────┘
-    ```
+#### 📌 Temel Mantık: Bir IP Adresi İki Parçadan Oluşur
+Bir IP adresi (örneğin evinizdeki `192.168.1.50`) aslında iki ayrı bilgiyi bir arada taşır:
+1. **Ağ Kimliği (Mahalle / Site Adı):** O ağdaki tüm cihazlar için ortaktır.
+2. **Cihaz Kimliği (Daire Numarası):** Sadece o cihaza özeldir.
 
-    1. **Neden `/28` Maskesi (Kapasite ve İsraf Önleme)?**  
-       * $32 - 28 = 4$ bit host alanı bırakır: $2^4 = 16$ toplam IP adresi.  
-       * Standart ağlarda $16 - 2 = 14$ kullanılabilir host bulunur (AWS VPC'de ilk 4 ve son 1 IP bulut servisleri için rezerve edildiğinden geriye tam $11$ IP kalır).  
-       * Bir e-ticaret sitesinde web katmanı trafiğe göre 50-100 sunucuya kadar büyüyebilirken (`Auto-scaling`), veritabanı katmanı genellikle 1 Primary (Yazma) + 2 Read Replica (Okuma) gibi az sayıda (3-5 sunucu) düğümden oluşur. Dolayısıyla veritabanına devasa bir `/24` (254 IP) tahsis etmek IP israfıdır; `/28` maskesi hem güvenli hem de tam ihtiyaca uygundur.
-    
-    2. **Yönlendirme Tablosu (Route Table) İle Fiziksel İzolasyon:**  
-       * **Public Subnet:** Yönlendirme tablosunda `0.0.0.0/0 -> igw-xxxx` (*Internet Gateway*) tanımı bulunur; yani doğrudan internete çıkabilir ve internetten istek alabilir.  
-       * **Private Subnet:** Yönlendirme tablosunda **kesinlikle Internet Gateway (IGW) rotası yer almaz**. Bu subnet içindeki veritabanı sunucularına bir Public IP tanımlanamaz. Dış dünyadan bir saldırganın bu IP bloğuna doğrudan ping atması veya port taraması yapması fiziksel ve mantıksal olarak imkansızdır.
-    
-    3. **Güvenlik Grupları (Security Groups / Firewall Kuralları):**  
-       * Veritabanının önüne konulan Güvenlik Grubu (SG) kuralı şu şekilde kilitlenir:
-         * **Gelen Trafik (Inbound):** `Port 5432 (PostgreSQL)` $\rightarrow$ **Kaynak (Source):** Yalnızca `10.0.1.0/24` (Web Subnet CIDR) veya `sg-web-servers` güvenlik grubu.  
-         * **İnternet Kaynağı (`0.0.0.0/0`):** Tamamen engellenmiştir (Drop).  
-       * **Sonuç:** Bir saldırgan internet üzerinden veritabanına asla ulaşamaz. Veritabanına erişebilmek için önce `Public Subnet` üzerindeki bir web sunucusunun hacklenmesi (Pivot/Bastion noktası) gerekir. Bu da saldırı yüzeyini minimuma indirir.
-  * **Noktadan Noktaya (Point-to-Point) Link Tasarımı:** İki kurumsal omurga router'ını birbirine bağlarken IP israfını önlemek amacıyla yalnızca 2 kullanılabilir IP veren `/30` (`255.255.255.252`) veya RFC 3021 standardı ile broadcast adresi gerektirmeyen `/31` maskeleri kullanılır.
+> ❓ **Soru:** Bilgisayar `192.168.1.50` adresine baktığında bu 4 sayının neresinin "Mahalle Adı", neresinin "Daire Numarası" olduğunu nereden anlar?  
+> 👉 **Cevap:** Bunu bilgisayara söyleyen rehber şablona **Subnet Mask (Alt Ağ Maskesi)** denir!
+
+---
+
+#### 🧩 Subnet Mask Nasıl Çalışır? (`255.255.255.0` Örneği)
+Maske, IP adresinin üzerine konulan bir filtre gibidir:
+* **`255` yazan kısımlar:** *"Burası Mahalle adıdır; sabittir, dokunulamaz!"* der.
+* **`0` yazan kısım:** *"Burası Daire numarasıdır; cihazlara göre değişebilir!"* der.
+
+| Bileşen | Değer | Ne Anlama Gelir? |
+| :--- | :--- | :--- |
+| **Cihazınızın IP'si** | `192 . 168 . 1 . 50` | Bilgisayarınızın tam adresi |
+| **Subnet Mask** | `255 . 255 . 255 . 0` | İlk 3 kısım Mahalle, son kısım Daire No |
+| **Ağ Adı (Network ID)** | `192.168.1.x` | Sizin bağlı olduğunuz mahalle/ağ |
+| **Cihaz No (Host ID)** | `.50` | Sizin bilgisayarınızın kapı numarası |
+
+* **Aynı Ağda mıyız, Farklı Ağda mı? (İletişim Kararı):**  
+  * Yan odadaki bilgisayar `192.168.1.60` ise $\rightarrow$ İkinizin de mahalle kısmı `192.168.1` olduğu için **aynı yerel ağdasınız**. Paket modeme gitmeden switch üzerinden doğrudan gider.
+  * Karşıdaki bilgisayar `192.168.2.50` ise $\rightarrow$ Onun mahallesi `192.168.2` olduğu için **farklı bir mahallededir**. Ona doğrudan seslenemezsiniz; paketi kapıdaki yönlendiriciye (Default Gateway) teslim etmeniz gerekir.
+
+---
+
+#### 📏 CIDR Nedir? O Slash (`/24`) Nereden Geliyor?
+Bilgisayarlar sayıları ikilik sistemde (1 ve 0 olarak) tutar. Her `255` sayısı yan yana sekiz tane `1` demektir:
+$$\underbrace{11111111}_{255} . \underbrace{11111111}_{255} . \underbrace{11111111}_{255} . \underbrace{00000000}_{0}$$
+Burada toplamda **24 tane `1`** vardır. Ağ mühendisleri her seferinde uzun uzun `255.255.255.0` yazmak yerine kısaca **/24** yazarlar (`192.168.1.0/24`).
+
+* **Kural:** Slash'ten sonraki sayı, 32 bitlik IP adresinin baştan kaç bitinin "Ağ Adı" olarak kilitlendiğini gösterir.
+* **Cihazlara Kalan Bit:** Toplam 32 bit olduğuna göre $32 - 24 = \mathbf{8\text{ bit}}$ kalır.
+* **Toplam Üretilebilecek IP:** $2^8 = \mathbf{256\text{ adet}}$.
+
+---
+
+#### 🚫 Ağdaki 2 Yasaklı Adres (Network ve Broadcast)
+Bir alt ağda üretilen tüm IP'ler bilgisayarlara verilemez; en baştaki ve en sondaki adresler rezerve edilmiştir:
+1. **Network Adresi (İlk IP - örn: `192.168.1.0`):** O alt ağın kimlik kartıdır; hiçbir cihaza atanamaz.
+2. **Broadcast Adresi (Son IP - örn: `192.168.1.255`):** Mahalledeki anons hoparlörüdür. Bu adrese bir paket gönderildiğinde ağdaki tüm cihazlar o paketi alır. Cihazlara atanamaz.
+* **Kullanılabilir Cihaz Sayısı Formülü:** $\mathbf{2^{(32 - \text{CIDR})} - 2}$  
+  * `/24` için: $2^{(32-24)} - 2 = 256 - 2 = \mathbf{254\text{ cihaz}}$ bağlanabilir.
+
+---
+
+#### ✂️ Neden Ağları Böleriz? (Subnetting İhtiyacı)
+Bir fabrikada veya okulda 500 bilgisayar olduğunu hayal edin:
+* Eğer hepsi tek bir büyük ağda olursa, bir cihazın yaptığı anons (Broadcast) 500 bilgisayarı da meşgul eder ve ağ yavaşlar.
+* Ayrıca Muhasebe bilgisayarları ile Misafir Wi-Fi'ına bağlanan yabancıların aynı ağda olması büyük bir güvenlik açığıdır.
+* Bu yüzden büyük ağı küçük alt ağlara (Subnet'lere) böleriz.
+
+---
+
+#### 🏢 Gerçek Hayattan İki Boyutlandırma Örneği
+
+##### 1. Veritabanı İçin Neden `/28` Seçilir? (Bulut Mimarisi)
+* Bir şirketin web sitesi için 50-100 sunucu gerekebilirken, veritabanı katmanı genellikle yalnızca **3-4 sunucudan** (1 Ana Sunucu + 2 Yedek Sunucu) oluşur.
+* Bu 4 veritabanı sunucusu için 254 kişilik devasa bir `/24` alt ağı açmak hem IP adreslerini israf etmektir hem de kontrolsüzce geniş bir alan bırakmaktır.
+* Bunun yerine **`/28`** maskesi tanımlanır:
+  * $32 - 28 = 4$ bit kalır $\rightarrow 2^4 = 16$ toplam IP adresi.
+  * İlk ve son adres düşünce geriye tam **14 kullanılabilir IP** kalır.
+* **Güvenlik Avantajı:** Veritabanları bu 14 kişilik küçük ve özel alt ağa (Private Subnet) konur. Bu alt ağın internete doğrudan hiçbir kapısı (Internet Gateway rotası) açılmaz. Dış dünyadan internetteki hiç kimse veritabanına doğrudan ulaşamaz; yalnızca web sunucularının bulunduğu alt ağdan gelen bağlantılara izin verilir.
+
+##### 2. İki Cihaz Arasındaki Kablo İçin Neden `/30` Seçilir? (Noktadan Noktaya Bağlantı)
+* İki büyük yönlendiriciyi (Router A ve Router B) birbirine bağlayan tek bir kablo düşünün. Bu hat üzerinde başka hiçbir bilgisayar olmayacaktır.
+* Bu iki cihaza 254 kişilik `/24` verirseniz arta kalan 252 IP tamamen çöpe gider.
+* Bunun yerine tam ihtiyaca uygun olan **`/30`** maskesi verilir:
+  * $32 - 30 = 2$ bit kalır $\rightarrow 2^2 = 4$ toplam IP adresi.
+  * İlk ve son adres düşünce geriye tam **2 kullanılabilir IP** kalır.
+  * Birinci IP Router A'ya, ikinci IP Router B'ye verilir. **Sıfır israf!**
 
 ---
 
