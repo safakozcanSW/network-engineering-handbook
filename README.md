@@ -599,21 +599,15 @@ graph LR
 | **Kimi Korur / Temsil Eder?** | İstemciyi (Client) internetten korur | Sunucuları (Backend) internetten korur |
 | **Konum** | İstemcinin yerel ağında / çıkışında | Sunucu kümesinin önünde |
 | **Görünürlük** | Hedef web sitesi istemcinin gerçek IP'sini görmez | İstemci arkadaki sunucuların gerçek IP'lerini bilmez |
-| **Temel       > 2. **Modem ile Firewall Arasındaki Köprü (İkinci Kablo - Bakır Ethernet):** Modemin arkasındaki `LAN 1` portundan IT mühendisi **ikinci bir ethernet kablosu** çıkarır ve bu kabloyu donanımsal Firewall kutusunun **`WAN (İnternet)`** portuna takar!  
-     >    * > 🌐 **"Neden Özellikle WAN Portuna Takılıyor? WAN ve LAN Nedir, Burada Ne İşe Yararlar?"**  
-     >      > * **LAN (Local Area Network - Yerel Alan Ağı):** Evinizin, ofisinizin veya şirketinizin **içerideki güvenli sınırıdır**. Şirketteki bilgisayarlar, yazıcılar ve yerel sunucular birbirine güvenir ve hepsi LAN tarafındadır.  
-     >      > * **WAN (Wide Area Network - Geniş Alan Ağı):** O kapının dışındaki **büyük, tekinsiz ve vahşi dış dünyadır (yani İnternet)**.  
-     >      > * **Neden Firewall'un WAN Portuna Takılır?**  
-     >      >   Firewall cihazı *"Hangi portum tekinsiz dış dünyaya (internete) bakıyor, hangi portum bizim güvenli ofisimize bakıyor?"* ayrımını bu port isimlerine göre yapar:  
-     >      >   * **WAN Portu = Dış Kapıdır (Giriş Kapısı):** Modemden gelen hat doğrudan WAN'a girer. Firewall bu porta gelen her pakete varsayılan olarak **"Düşman / Şüpheli"** muamelesi yapar. Tüm portları dışarıya kapatır, izinsiz hiçbir dış isteğin içeri girmesine izin vermez.  
-     >      >   * **LAN Portu = İç Kapıdır (Odalara Açılan Kapı):** Şirket içindeki bilgisayarların bağlandığı taraftır. Firewall buradan gelen paketlere **"Bizim personel, dışarı çıkmak istiyor"** diyerek izin verir ve dönüş yolunu hafızasına kaydeder.  
-     >      >   * ⚠️ **Yanlış Port Takılırsa Ne Olur?** Eğer modemden gelen kabloyu Firewall'un WAN portu yerine yanlışlıkla LAN portuna takarsanız; Firewall dış dünyayı "iç ağdaki dost" zanneder! Bütün güvenlik kuralları baypas olur, hacker saldırıları ve internetin tüm açık trafiği doğrudan şirket içine kontrolsüzce dolar!
-     > 3. **Firewall'dan İç Ağa (Üçüncü Kablo):** Firewall kutusunun **`LAN`** portundan çıkan üçüncü kablo da ana omurga anahtarına (**Core Switch**) gider.  
-     > 
-     > 🔗 **Fiziksel Kablo Zinciri:**  
-     > `[Sokak / ISP Fiber Kablosu]` $\longrightarrow$ **Modem/ONT** $\longrightarrow$ `[Ethernet Patch Kablosu]` $\longrightarrow$ **Firewall (WAN Portu)** $\longrightarrow$ `[Ethernet Patch Kablosu]` $\longrightarrow$ **Core Switch (LAN Portu)**  
-     > 
-     > 💡 **Püf Noktası (Köprü / Bridge Modu):** IT mühendisi modemin içine girip onu **"Bridge (Köprü) Modu"**na alır. Böylece modem hiçbir IP dağıtımı veya güvenlik işine karışmaz; sokaktan gelen fiber ışık sinyalini elektriğe çevirip olduğu gibi Firewall'un WAN portuna fırlatan aptal bir dönüştürücüye dönüşür. Dış internetin gerçek Public IP'sini doğrudan Firewall kutusu WAN bacağına alır. Nginx üzerine alınır; Node.js/Python/Go servisleri saf HTTP ile rahat çalışır. Versiyon güncellemelerinde Nginx trafiği sırayla sunuculara yönlendirerek kesintisiz geçiş sağlar (*Blue-Green Deployment: Eski sürüm [Mavi] çalışırken yeni sürümün [Yeşil] arka planda hazır edilip trafiğin anında yeni sürüme aktarılmasıyla sıfır kesinti sağlayan güncelleme yöntemidir*).
+| **Temel Görevleri** | Şirket içi içerik filtreleme, anonimlik, önbellek | Yük dengeleme (Load Balancing), SSL Karşılama, WAF |
+| **Popüler Yazılımlar** | Squid, Shadowsocks, Charles Proxy | Nginx, HAProxy, Traefik, Envoy |
+
+* **Gündelik Hayatta Karşılığı:**  
+  * **Forward Proxy:** Alışverişe sizin yerinize giden bir **özel yardımcı** gibidir; satıcı ürünün kime gittiğini bilmez, yalnızca yardımcıyı görür.
+  * **Reverse Proxy:** Büyük bir holdingin **çağrı merkezi santralidir**; müşteri tek bir numarayı arar, santral arkadaki 50 müşteri temsilcisinden boşta olanına bağlar. Müşteri personelin dahili numarasını bilmez.
+* **Alternatif Kullanım Amaçları ve Örnekleri:**
+  * **Web Scraping ve Fiyat Takibi (Rotating Residential Proxy):** E-ticaret sitelerinden piyasa fiyatı toplayan botlar bot engellerine takılmamak için binlerce konut IP proxy havuzu üzerinden her istekte farklı vekil sunucu kullanarak veri çeker.
+  * **SSL Termination ve Zero-Downtime Deployment:** Backend sunucularına binen HTTPS şifreleme ve çözme yükü Nginx üzerine alınır; Node.js/Python/Go servisleri saf HTTP ile rahat çalışır. Versiyon güncellemelerinde Nginx trafiği sırayla sunuculara yönlendirerek kesintisiz geçiş sağlar (*Blue-Green Deployment: Eski sürüm [Mavi] çalışırken yeni sürümün [Yeşil] arka planda hazır edilip trafiğin anında yeni sürüme aktarılmasıyla sıfır kesinti sağlayan güncelleme yöntemidir*).
 
 ---
 
@@ -638,12 +632,20 @@ Ahmet sabah ofise gelip kabloyu takmadan **önce**, şirketin IT (Bilgi İşlem)
      > **Hayır, tek bir kablo iki cihaza aynı anda girmez! Bağlantı YAN YANA değil, ARKA ARKAYA (Seri / Zincirleme) yapılır:**  
      > 1. **Dışarıdan Gelen Hat (Fiber / Sokak Kablosu):** Türk Telekom / Turkcell gibi servis sağlayıcının getirdiği sarı fiber kablo **doğrudan ve yalnızca ana modeme / ONT cihazına (Optik Ağ Sonlandırıcı)** takılır.  
      > 2. **Modem ile Firewall Arasındaki Köprü (İkinci Kablo - Bakır Ethernet):** Modemin arkasındaki `LAN 1` portundan IT mühendisi **ikinci bir ethernet kablosu** çıkarır ve bu kabloyu donanımsal Firewall kutusunun **`WAN (İnternet)`** portuna takar!  
+     >    * > 🌐 **"Neden Özellikle WAN Portuna Takılıyor? WAN ve LAN Nedir, Burada Ne İşe Yararlar?"**  
+     >      > * **LAN (Local Area Network - Yerel Alan Ağı):** Evinizin, ofisinizin veya şirketinizin **içerideki güvenli sınırıdır**. Şirketteki bilgisayarlar, yazıcılar ve yerel sunucular birbirine güvenir ve hepsi LAN tarafındadır.  
+     >      > * **WAN (Wide Area Network - Geniş Alan Ağı):** O kapının dışındaki **büyük, tekinsiz ve vahşi dış dünyadır (yani genel İnternet)**.  
+     >      > * **Neden Firewall'un WAN Portuna Takılır?**  
+     >      >   Firewall cihazı *"Hangi portum tekinsiz dış dünyaya (internete) bakıyor, hangi portum bizim güvenli ofisimize bakıyor?"* ayrımını bu port isimlerine göre yapar:  
+     >      >   * **WAN Portu = Dış Kapıdır (Giriş Kapısı):** Modemden gelen hat doğrudan WAN'a girer. Firewall bu porta gelen her pakete varsayılan olarak **"Düşman / Şüpheli"** muamelesi yapar. Tüm portları dışarıya kapatır, izinsiz hiçbir dış isteğin içeri girmesine izin vermez.  
+     >      >   * **LAN Portu = İç Kapıdır (Odalara Açılan Kapı):** Şirket içindeki bilgisayarların bağlandığı taraftır. Firewall buradan gelen paketlere **"Bizim personel, dışarı çıkmak istiyor"** diyerek izin verir ve dönüş yolunu hafızasına kaydeder.  
+     >      >   * ⚠️ **Yanlış Port Takılırsa Ne Olur?** Eğer modemden gelen kabloyu Firewall'un WAN portu yerine yanlışlıkla LAN portuna takarsanız; Firewall dış dünyayı "iç ağdaki dost" zanneder! Bütün güvenlik kuralları baypas olur, hacker saldırıları ve internetin tüm açık trafiği doğrudan şirket içine kontrolsüzce dolar!  
      > 3. **Firewall'dan İç Ağa (Üçüncü Kablo):** Firewall kutusunun **`LAN`** portundan çıkan üçüncü kablo da ana omurga anahtarına (**Core Switch**) gider.  
      > 
      > 🔗 **Fiziksel Kablo Zinciri:**  
-     > `[Sokak / ISP Fiber Kablosu]` $\longrightarrow$ **Modem/ONT** $\longrightarrow$ `[Ethernet Patch Kablosu]` $\longrightarrow$ **Firewall (WAN Portu)** $\longrightarrow$ `[Ethernet Patch Kablosu]` $\longrightarrow$ **Core Switch (LAN)**  
+     > `[Sokak / ISP Fiber Kablosu]` $\longrightarrow$ **Modem/ONT** $\longrightarrow$ `[Ethernet Patch Kablosu]` $\longrightarrow$ **Firewall (WAN Portu)** $\longrightarrow$ `[Ethernet Patch Kablosu]` $\longrightarrow$ **Core Switch (LAN Portu)**  
      > 
-     > 💡 **Püf Noktası (Köprü / Bridge Modu):** IT mühendisi modemin içine girip onu **"Bridge (Köprü) Modu"**na alır. Böylece modem hiçbir IP dağıtımı veya güvenlik işine karışmaz; sokaktan gelen fiber ışık sinyalini elektriğe çevirip olduğu gibi Firewall'a fırlatan aptal bir dönüştürücüye dönüşür. Dış internetin gerçek Public IP'sini doğrudan Firewall kutusu üzerine alır.
+     > 💡 **Püf Noktası (Köprü / Bridge Modu):** IT mühendisi modemin içine girip onu **"Bridge (Köprü) Modu"**na alır. Böylece modem hiçbir IP dağıtımı veya güvenlik işine karışmaz; sokaktan gelen fiber ışık sinyalini elektriğe çevirip olduğu gibi Firewall'un WAN portuna fırlatan aptal bir dönüştürücüye dönüşür. Dış internetin gerçek Public IP'sini doğrudan Firewall kutusu WAN bacağına alır.
    * > 🧱 **"Buradaki Firewall Nedir? Fiziksel Bir Kutu mudur, Yazılım mıdır?"**  
      > Kurumsal şirketlerde Firewall genellikle **fiziksel bir donanım kutusudur** (Fortinet FortiGate, Palo Alto, Cisco ASA/Firepower gibi markaların sunucu kabinine [Rack kabin] monte edilen 1U/2U boyutlarındaki özel cihazlarıdır).  
      > * **Fiziksel Kutu (Hardware Appliance):** İçerisinde ağ paketlerini saniyede gigabitlerce hızda taramak için özel güvenlik işlemcileri (ASIC/NPU) barındıran müstakil bir sunucu kutusudur. Modemden çıkan ethernet kablosu bu kutunun `WAN` portuna girer; iç ağa gidecek olan kablo ise `LAN` portundan çıkar.  
