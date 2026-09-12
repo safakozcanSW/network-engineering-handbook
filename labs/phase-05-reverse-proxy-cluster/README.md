@@ -49,10 +49,14 @@ docker compose ps
 ## 🔍 Adım Adım İnceleme ve Deneyler
 
 ### 1. Adım: Yük Dağıtımını Canlı İzleme
-Ahmet'in bilgisayarından Nginx'e peş peşe 4 kez istek atalım:
+Ahmet'in bilgisayarına bağlanıp Nginx'e peş peşe 4 kez istek atalım:
 
 ```bash
-docker exec -it ahmet-pc sh -c 'for i in 1 2 3 4; do curl -s http://10.20.1.50 | grep "served_by"; sleep 0.5; done'
+# 1. Ahmet'in container kabuğuna (Linux terminali) bağlanın:
+docker exec -it ahmet-pc sh
+
+# 2. Container içinde peş peşe 4 istek gönderin:
+for i in 1 2 3 4; do curl -s http://10.20.1.50 | grep "served_by"; sleep 0.5; done
 ```
 
 #### 📋 Örnek Çıktı:
@@ -63,6 +67,8 @@ docker exec -it ahmet-pc sh -c 'for i in 1 2 3 4; do curl -s http://10.20.1.50 |
   "served_by": "backend-02 (Raporlama Servisi)",
 ```
 🎉 Görüldüğü gibi Ahmet tek bir IP adresine (`10.20.1.50`) gitmektedir; ancak Nginx istekleri arkadaki iki sunucuya sırayla ve adilce paylaştırmaktadır!
+
+> 💡 **İpucu:** Çıkış yapmak istediğinizde `exit` yazabilirsiniz. Ancak 2. ve 3. adımları da doğrudan bu açık terminalden çalıştırabilirsiniz.
 
 ---
 
