@@ -117,6 +117,20 @@ Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik 
     
     3. **Büyük Avantajı:**  
        Sanal sunucunun işletim sistemi içine girip elle statik IP yapılandırması (`netplan`, `ifcfg` vb.) yapmakla uğraşmazsınız. Sanal makineyi silseniz, formatlasanız veya yeniden kursanız dahi; XML şablonunda MAC adresi sabit olduğu sürece açılır açılmaz DHCP'den aynı rezerve IP'yi (`192.168.1.100`) çeker. Böylece web veya veritabanı sunucunuzun IP'si hiçbir zaman kaybolmaz; güvenlik duvarı ve alan adı yönlendirmeleriniz asla bozulmaz.
+
+    4. **Soru: Cihaza İstediğimiz IP Adresini Atayabilir miyiz? (Kurallar & 2 Yöntem):**  
+       **Evet, atayabilirsiniz; ancak tamamen keyfi bir adres veremezsiniz.** Modemin yerel alt ağ (Subnet) kurallarına uygun bir adres seçmeniz gerekir. Bu işlem iki farklı yöntemle yapılabilir:
+
+       * **1. Yöntem: Modem Üzerinden IP Rezervasyonu (Statik DHCP / DHCP Binding) — En Sağlıklı Yol:**  
+         Modem/Router web arayüzüne (`192.168.1.1` veya `192.168.0.1`) girilir $\rightarrow$ *LAN / DHCP Ayarları* bölümünden *Statik IP / IP Rezervasyonu / DHCP Bağlama* sekmesine gidilir $\rightarrow$ Cihazın **MAC adresi** ile vermek istediğiniz **yerel IP adresi** eşleştirilip kaydedilir. Cihaz her bağlandığında belirlenen adresi otomatik olarak alır.
+       * **2. Yöntem: Cihazın Kendi Üzerinden Statik IP Tanımlama:**  
+         Modemle uğraşmadan, doğrudan bilgisayarın, telefonun veya konsolun ağ/Wi-Fi ayarlarından IP dağıtımı "Otomatik (DHCP)" yerine "Elle (Statik)" olarak yapılandırılır.
+
+       > ⚠️ **İstediğiniz IP'yi Seçerken Uyulması Zorunlu 4 Altın Kural:**
+       > 1. **Aynı Alt Ağ Bloğunda (Subnet) Olmalı:** Modemin IP adresi `192.168.1.1` ise, vereceğiniz IP de mutlaka `192.168.1.X` formatında olmalıdır ($X: 2-254$). `10.0.0.X` veya `192.168.2.X` gibi farklı bir bloktan adres verirseniz cihaz ağa veya internete erişemez.
+       > 2. **Modem/Gateway IP'si ile Çakışmamalı:** Modemin kendi kullandığı IP (`192.168.1.1`) başka bir cihaza verilemez.
+       > 3. **Başka Cihaz Tarafından Kullanılmamalı (IP Çakışması):** Seçeceğiniz IP adresi halihazırda ağa bağlı başka bir cihaza (TV, telefon, yazıcı vb.) ait olmamalıdır. Çakışma olursa iki cihazda da bağlantı kopmaları yaşanır.
+       > 4. **DHCP Dağıtım Havuzunun Dışından Seçilmeli:** Modemler dinamik IP'leri genelde `192.168.1.100 - 192.168.1.200` aralığından rastgele dağıtır. Çakışma riskini en aza indirmek için sabit tutmak istediğiniz cihazlara bu havuzun dışındaki adresleri (örneğin `192.168.1.20` veya `192.168.1.220`) atamak en güvenli yoldur.
 * **Gündelik Hayatta Karşılığı:**  
   > 💡 **Analoji:** Bir insanın **T.C. Kimlik Numarası** gibidir; kişi nereye taşınırsa taşınsın bu kimlik sabittir. Evdeki Wi-Fi modeminizde *"MAC Filtreleme"* açarak sadece evdeki cihazların MAC adreslerine izin vermek ve komşunuz şifreyi bilse dahi ağa girmesini engellemek en tipik örneğidir.
 * **Alternatif Kullanım Amaçları ve Örnekleri:**
@@ -131,7 +145,11 @@ Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik 
 * **Kullanım Amacı:** OSI 3. Katmanda (Network) paketlerin farklı yerel ağlar ve internet omurgası üzerinden hedefe yönlendirilmesini (Routing) sağlar.
 * **IPv4 vs IPv6 (Neden Yeni Protokole Geçiyoruz?):**
   * **IPv4 (32-bit):** Yaklaşık $2^{32} \approx 4.3$ milyar adres üretir. 2010'lu yıllarda dünyadaki tüm IPv4 adresleri tükenmiştir. Bu açığı kapatabilmek için **NAT (Network Address Translation)** tekniği geliştirilmiştir.
-    > ℹ️ *NAT Nedir? Evinizdeki onlarca telefon ve bilgisayarın modem arkasına gizlenerek internete **tek bir ortak IP** üzerinden çıkmasını sağlayan adres çeviricisidir (Detayları [Modül 4 / Madde 10'da](#10-nat-network-address-translation) incelenecektir).*
+    > ℹ️ **NAT Nedir, Nasıl Yapılandırılır ve Nasıl Açılıp Kapanır?**  
+    > Evinizdeki onlarca telefon ve bilgisayarın modem arkasına gizlenerek internete **tek bir ortak Public IP** üzerinden çıkmasını sağlayan adres çeviricisidir.  
+    > * **Modemlerde Nasıl Yapılandırılır?** Modem web arayüzünde (`192.168.1.1`) *WAN / Ağ / İnternet Ayarları* sekmesi altında **"NAT: Etkin / Devre Dışı"** seçeneği bulunur (varsayılan olarak açıktır).  
+    > * **Pasif Edilirse Ne Olur? (Köprü / Bridge Modu):** NAT kapatıldığında modem yönlendirici kimliğini bırakıp sadece basit bir sinyal dönüştürücü köprüye (Bridge) dönüşür. Arkasındaki birden fazla cihaz tek bir internet IP'sini paylaşamaz ve internete çıkış durur. Bu işlem yalnızca modemin arkasına pfSense, FortiGate veya Cisco gibi harici profesyonel bir güvenlik duvarı takıldığında (çifte NAT'ı önlemek için) tercih edilir.  
+    > *(Detaylı modem ayarları, port açma adımları ve Linux `iptables` komutları için [Modül 4 / Madde 10'a](#10-nat-network-address-translation) bakabilirsiniz).*
   * **IPv6 (128-bit):** Yaklaşık $2^{128} \approx 3.4 \times 10^{38}$ (trilyonlarca trilyon) adres üretir. Dünyadaki her kum tanesine binlerce IP verilebilecek büyüklüktedir. 
     * **NAT Zorunluluğunu Kaldırır:** Her cihaz doğrudan genel internette uçtan uca (*End-to-End*) benzersiz bir küresel IP alabilir.
     * **Dahili Güvenlik:** Veri şifreleme standardı olan **IPsec** doğrudan protokolün içine gömülüdür.
@@ -512,6 +530,49 @@ graph TD
   192.168.1.20:53400       ──► 88.240.12.5:41002                 ──► 142.250.184.206:443
   ```
   Google sunucusu cevabı modemin `41002` nolu portuna döndüğünde, modem hafızasındaki tabloya bakar: *"41002 portu içerideki `192.168.1.20:53400` cihazına aitti"* der ve paketi doğrudan o telefona teslim eder. Paketler asla birbirine karışmaz.
+* **Ayar, Yapılandırma & Aktif/Pasif Etme Mekanizmaları:**
+  
+  #### 1. Ev ve Ofis Modemlerinde NAT Yönetimi:
+  * **NAT'ı Aktif Etme (Varsayılan):**  
+    Tarayıcıdan modem arayüzüne (`192.168.1.1` veya `192.168.0.1`) girilir $\rightarrow$ *WAN / Ağ / İnternet Bağlantısı* menüsünden **"NAT Etkinleştir (Enable NAT)"** kutucuğu işaretlenir. Bu sayede evdeki tüm cihazlar modemin tek genel (Public) IP'sini paylaşarak internete çıkar.
+  * **NAT'ı Pasif Etme (Devre Dışı Bırakma / Köprü - Bridge Modu):**  
+    Modem arayüzünde "NAT Devre Dışı" seçilir veya bağlantı tipi **Bridge (Köprü)** moduna alınır.
+    * **Sonuç:** Modem artık IP dağıtan bir yönlendirici (Router) olmaktan çıkar; saf bir Katman 2 sinyal dönüştürücüsüne (Fiber/DSL $\leftrightarrow$ Ethernet köprüsü) dönüşür. Modeme doğrudan bağlı birden fazla cihaz internete çıkamaz (çünkü ISP yalnızca tek bir IP verir ve NAT olmadan bu IP paylaşılamaz).
+    * **Ne Zaman Tercih Edilir?** Modemin arkasına **pfSense, FortiGate, OPNsense veya Cisco** gibi kurumsal bir güvenlik duvarı takıldığında; iki cihazın üst üste IP çevirisi yapmasını (**Çifte NAT / Double NAT** sorunu — oyun sunucularında ve VPN bağlantılarında kopmalara yol açar) engellemek için ana modem Bridge moduna alınır ve NAT tamamen kapatılır.
+  * **Port Yönlendirme (DNAT / Port Forwarding) Nasıl Yapılır?**  
+    Modem arayüzünde *NAT $\rightarrow$ Port Yönlendirme (Virtual Server / Port Forwarding)* menüsüne gidilir:
+    * **Kural Adı:** `Kamera-Sistemi` veya `Web-Sunucu`
+    * **Protokol:** `TCP` (veya `UDP`)
+    * **Dış Port (WAN Port):** `8080` (Dış dünyadaki kullanıcıların bağlanacağı port)
+    * **İç IP (LAN Host):** `192.168.1.100` (Evin içindeki sunucunun sabit yerel IP'si)
+    * **İç Port:** `80` (Sunucunun yerelde dinlediği port)  
+    Kaydedildiğinde dışarıdan `http://modem_public_ip:8080` adresine gelen istekler içerideki `192.168.1.100:80` servisine yönlendirilir.
+  * **DMZ (Demilitarized Zone) & UPnP:**  
+    * **DMZ:** Dışarıdan gelen ve özel bir kuralı bulunmayan tüm portları koşulsuz şartsız seçilen tek bir iç IP'ye (örneğin konsol veya test makinesine) yönlendirir (Güvenlik zafiyeti riski yüksektir).
+    * **UPnP (Universal Plug and Play):** Oyun konsolları (PlayStation, Xbox) veya torrent istemcilerinin modemde ihtiyaç duydukları portları kullanıcı müdahalesi olmadan dinamik açıp kapatmasını sağlar.
+
+  #### 2. Linux Sunucularda ve Router'larda NAT Ayarları (`iptables` & `sysctl`):
+  ```bash
+  # 1. Adım: Çekirdekte IP Yönlendirmeyi Açma (Ön Koşul)
+  sudo sysctl -w net.ipv4.ip_forward=1
+  echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf
+
+  # 2. Adım: NAT'ı Aktif Etme (İnternet Paylaşımı - SNAT / Masquerade)
+  # eth0 (Dış WAN arayüzü) üzerinden yerel ağ trafiğini maskele:
+  sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+
+  # 3. Adım: Port Yönlendirmeyi (DNAT) Aktif Etme
+  # Dışarıdan 8080 portuna gelen istekleri iç sunucuya (192.168.1.100:80) çevir:
+  sudo iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 8080 -j DNAT --to-destination 192.168.1.100:80
+
+  # 4. Adım: NAT'ı Pasif Hale Getirme (Kapatma / Kuralları Sıfırlama)
+  sudo iptables -t nat -F              # Tüm NAT yönlendirme kurallarını siler
+  sudo sysctl -w net.ipv4.ip_forward=0  # Yönlendirmeyi tamamen kapatır
+
+  # 5. Adım: Canlı NAT Çeviri Tablosunu ve Sayaçları İnceleme
+  sudo iptables -t nat -L -n -v --line-numbers
+  ```
+  > 🧪 **Uygulamalı Test:** Docker üzerinde SNAT Masquerade ve DNAT kurallarını canlı görmek için [**Faz 3 Laboratuvarımıza**](labs/phase-03-nat-and-port-mapping/) göz atabilirsiniz.
 * **Gündelik Hayatta Karşılığı:**  
   > 💡 **Analoji:** Bir şirketin santral numarası gibidir. 500 çalışanın dışarıya doğru aramalarında karşı taraf sadece şirketin ana santral numarasını görür (**SNAT/PAT**). Müşteri şirketi arayıp *"Dahili 105'i bağlayın"* dediğinde ise santral çağrıyı ilgili personelin masasına aktarır (**Port Forwarding / DNAT**).
 * **Alternatif Kullanım Amaçları ve Örnekleri:**
