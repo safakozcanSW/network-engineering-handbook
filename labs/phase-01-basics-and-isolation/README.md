@@ -71,6 +71,31 @@ Siz `docker compose up -d` dediğinizde Docker; tek bir bilgisayarın işlemci v
 
 ---
 
+#### 🌉 E. Neden `docker-compose.yml` Dosyasında `driver: bridge` Seçtik? (Bridge Modunun Sırrı):
+
+Ağ mühendisliği terminolojisinde **"Bridge (Köprü)"**, Katman 2'de (Data Link Katmanı) çalışan ve paketleri **fiziksel MAC adreslerine bakarak anahtarlayan (Switching yapan)** cihaz demektir. Yani modern dünyada:
+$$\mathbf{Bridge \approx Sanal\ Switch}$$
+
+Docker'da container çalıştırırken seçebileceğiniz farklı ağ sürücüleri (driver) vardır; fakat bu senaryoda **`driver: bridge`** seçmemizin çok hayati 3 sebebi vardır:
+
+1. **İki Ayrı Yazılımsal Switch (Tam İzolasyon) Yaratmak:**  
+   Docker'a `driver: bridge` dediğimizde, Linux çekirdeğinde birbirinden bağımsız iki adet sanal switch arayüzü (`br-xxxx` ve `br-yyyy`) yaratılır. Bu sayede `vlan10` switch'ine bağlı olan Ahmet ile `vlan20` switch'ine bağlı olan Muhasebe arasında donanım/yazılım seviyesinde çelik bir duvar örülmüş olur.
+
+2. **Özel Alt Ağ (Subnetting) ve Sabit IP Belirleyebilmek:**  
+   `bridge` sürücüsü sayesinde ağın IP havuzunu (`subnet: 10.10.1.0/24`), kapı numarasını (`gateway: 10.10.1.1`) ve container'ların sabit IP adreslerini (`ipv4_address: 10.10.1.45`) santim santim kendimiz yönetebiliriz.
+
+3. **Diğer Modları Neden Seçmedik? (Karşılaştırma):**
+   * **Neden `host` Modu Değil?**  
+     `host` modunu seçseydik, container'ların hiçbir bağımsız sanal ağ kartı veya IP'si olmazdı; doğrudan sizin Windows/Linux ana makinenizin gerçek IP'sini paylaşırlardı. Dolayısıyla ortada ne iki ayrı alt ağ ne de bir ağ izolasyonu kalırdı!
+   * **Neden `none` Modu Değil?**  
+     `none` modunda container'ın içine hiçbir ağ kartı takılmaz (sadece `127.0.0.1` kalır). Cihaz dünyadan tamamen kopar; aynı odadaki arkadaşına bile ping atamaz.
+   * **Neden `macvlan` Değil?**  
+     `macvlan`, container'ı evdeki gerçek fiziksel Wi-Fi/Ethernet modeminize bağlar. Bu mod ev ağında bağımsız IP almak için harikadır; fakat bizim amacımız kendi içimizde izole laboratuvar alt ağları kurmaktır.
+
+Özetle: **`driver: bridge`**, bilgisayarınızın içinde sıfır maliyetle onlarca **sanal Cisco switch** oluşturup aralarında gerçekçi ağ simülasyonları yapmanın tek ve en doğru yoludur!
+
+---
+
 ### 2. IP Adresi ve Subnet Mask (`/24`) Nedir? (Mahalle ve Daire Benzetmesi)
 
 Bir IP adresine (`10.10.1.45`) baktığınızda bilgisayar bu sayıyı ikiye böler:
