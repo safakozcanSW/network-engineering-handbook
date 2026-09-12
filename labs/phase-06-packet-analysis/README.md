@@ -45,18 +45,32 @@ docker compose up -d
 ### 1. Adım: Birinci Terminalde `tcpdump` Dinleyicisini Başlatma
 Paketleri anlık olarak ekrana basmak için `client-pc` içinde bir paket yakalayıcı başlatalım:
 
+#### 🔹 1. Yol: Container İçine Girerek (Tavsiye Edilen - Hatasız)
+Windows CMD/PowerShell tek tırnakları (`'`) Linux gibi işlemediği için tırnak syntax hatası almamak adına container kabuğuna girmek en temiz yoldur:
 ```bash
-docker exec -it client-pc tcpdump -nn -i eth0 -v 'tcp or arp'
+# 1. client-pc terminaline bağlanın:
+docker exec -it client-pc sh
+
+# 2. tcpdump dinleyicisini başlatın:
+tcpdump -nn -i eth0 -v 'tcp or arp'
 ```
-*(Bu terminal dinlemede bekleyecektir; kapatmayın).*
+
+#### 🔹 2. Yol: Dış Terminalden (Windows CMD / PowerShell Uyumlu)
+Container içine girmeden doğrudan Windows terminalinden başlatmak isterseniz; **tek tırnak (`'`) yerine çift tırnak (`"`)** kullanın veya tırnaksız yazın:
+```cmd
+docker exec -it client-pc tcpdump -nn -i eth0 -v "tcp or arp"
+```
+*(veya tırnaksız: `docker exec -it client-pc tcpdump -nn -i eth0 -v tcp or arp`)*
+
+> ⚠️ *(Bu birinci terminal canlı dinlemede kalacaktır; kapatmayın).*
 
 ---
 
 ### 2. Adım: İkinci Terminalden İstek Atma (TCP El Sıkışması)
-**İkinci bir terminal penceresi açın** ve sunucuya tek bir HTTP isteği gönderin:
+**İkinci bir terminal penceresi açın** ve web sunucusuna tek bir HTTP isteği gönderin:
 
 ```bash
-docker exec -it client-pc curl -s http://10.30.1.50 > /dev/null
+docker exec -it client-pc curl -s http://10.30.1.50
 ```
 
 Şimdi birinci terminaldeki `tcpdump` ekranına dönün! Gözlerinizin önünde şu tarihî akış gerçekleşmiştir:

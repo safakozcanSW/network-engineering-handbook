@@ -49,7 +49,10 @@ docker compose ps
 ## 🔍 Adım Adım İnceleme ve Deneyler
 
 ### 1. Adım: Yük Dağıtımını Canlı İzleme
-Ahmet'in bilgisayarına bağlanıp Nginx'e peş peşe 4 kez istek atalım:
+Ahmet'in bilgisayarından Nginx'e peş peşe 4 kez istek atarak yükün nasıl paylaştırıldığını görelim:
+
+#### 🔹 1. Yol: Container İçine Girerek (Tavsiye Edilen - Windows & Linux Uyumlu)
+Windows CMD veya PowerShell'de `grep` ve döngü komutlarının tırnak/boru (`|`) hatası vermemesi için en temiz ve garantili yöntem doğrudan container terminaline bağlanmaktır:
 
 ```bash
 # 1. Ahmet'in container kabuğuna (Linux terminali) bağlanın:
@@ -59,6 +62,19 @@ docker exec -it ahmet-pc sh
 for i in 1 2 3 4; do curl -s http://10.20.1.50 | grep "served_by"; sleep 0.5; done
 ```
 
+*(İşiniz bitince çıkmak için `exit` yazabilirsiniz; ancak 2. ve 3. adımları da doğrudan bu açık terminalden çalıştırabilirsiniz).*
+
+#### 🔹 2. Yol: Dış Terminalden (Tek Satırda)
+Eğer container içine girmeden doğrudan Windows terminalinizden çalıştırmak isterseniz:
+* **Windows CMD (Komut İstemi) için:**
+  ```cmd
+  docker exec ahmet-pc sh -c "for i in 1 2 3 4; do curl -s http://10.20.1.50 | grep served_by; sleep 0.5; done"
+  ```
+* **PowerShell için:**
+  ```powershell
+  1..4 | ForEach-Object { docker exec ahmet-pc curl -s http://10.20.1.50 | Select-String "served_by"; Start-Sleep -Milliseconds 500 }
+  ```
+
 #### 📋 Örnek Çıktı:
 ```text
   "served_by": "backend-01 (Kayıt Servisi)",
@@ -67,8 +83,6 @@ for i in 1 2 3 4; do curl -s http://10.20.1.50 | grep "served_by"; sleep 0.5; do
   "served_by": "backend-02 (Raporlama Servisi)",
 ```
 🎉 Görüldüğü gibi Ahmet tek bir IP adresine (`10.20.1.50`) gitmektedir; ancak Nginx istekleri arkadaki iki sunucuya sırayla ve adilce paylaştırmaktadır!
-
-> 💡 **İpucu:** Çıkış yapmak istediğinizde `exit` yazabilirsiniz. Ancak 2. ve 3. adımları da doğrudan bu açık terminalden çalıştırabilirsiniz.
 
 ---
 
@@ -110,8 +124,15 @@ docker stop backend-1
 ```
 
 Şimdi Ahmet tekrar istek atsın:
+
+#### 🔹 1. Yol (Ahmet'in açık terminalinden):
 ```bash
-docker exec -it ahmet-pc curl -s http://10.20.1.50 | grep "served_by"
+curl -s http://10.20.1.50 | grep "served_by"
+```
+
+#### 🔹 2. Yol (Windows Dış Terminalinden):
+```cmd
+docker exec ahmet-pc sh -c "curl -s http://10.20.1.50 | grep served_by"
 ```
 
 #### 📋 Sonuç:
