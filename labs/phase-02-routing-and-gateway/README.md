@@ -6,6 +6,51 @@ Faz 1'de iki farklı alt ağın (`vlan10` ve `vlan20`) birbirinden tamamen izole
 
 ---
 
+## 🛣️ Inter-VLAN Yönlendirmenin 3 Yolu: Hangisi Ne Zaman Kullanılır?
+
+Ağ dünyasında iki farklı VLAN'ı (örneğin Personel ile Muhasebe) birbiriyle konuşturmanın 3 farklı yöntemi vardır:
+
+---
+
+### 1. Yöntem: Her VLAN İçin Ayrı Kablo (Geleneksel / Legacy Yöntem)
+
+Yukarıdaki ilk mimari görselinde gördüğünüz yapıdır:
+* Switch'in **VLAN 10** bölgesinden bir kablo çıkar $\rightarrow$ Router'ın **`eth0`** portuna takılır (`10.10.1.254`).
+* Switch'in **VLAN 20** bölgesinden ayrı bir kablo çıkar $\rightarrow$ Router'ın **`eth1`** portuna takılır (`10.20.1.254`).
+
+#### ❓ Neden Bu Laboratuvarda 1. Yöntemi Kullandık?
+1. **Docker ile Mükemmel Eşleşme:** Docker'da `core-router` container'ına `networks:` altında iki ayrı bridge ağı bağladığımızda (`vlan10_personel` ve `vlan20_sunucu`), Linux çekirdeği container içine tam olarak iki ayrı sanal ağ kartı (**`eth0`** ve **`eth1`**) takar.
+2. **Pedagojik ve Anlaşılır Olması:** Linux çekirdeğinde `net.ipv4.ip_forward=1` parametresinin sihrini; paketin sol koldan (`eth0`) girip, yönlendirilip sağ koldan (`eth1`) çıktığını komut satırında bizzat görmek en yalın bu yöntemle mümkündür.
+3. **Gerçek Hayattaki Sınırı:** Eğer şirkette 30 tane VLAN olsaydı, Router üzerine 30 tane pahalı port ve 30 tane kablo takmanız gerekirdi. Bu yüzden 3-4 VLAN'dan büyük kurumsal ağlarda 2. veya 3. yönteme geçilir.
+
+---
+
+### 2. Yöntem: Router-on-a-Stick (802.1Q Trunk ile Tek Kablo)
+
+Mühendisler 30 tane ayrı kablo çekmek yerine şu yöntemi icat etmiştir:
+* Switch ile Router arasına **tek bir adet yüksek hızlı kablo** takılır (**Trunk Hat**).
+* Paketler bu tek kablodan geçerken başlarına **4 baytlık küçük etiketler (VLAN Tag: 10 veya 20)** yapıştırılır (IEEE 802.1Q standardı).
+* Router üzerindeki o tek fiziksel port yazılımla sanal alt arayüzlere (**Sub-interfaces**) bölünür:
+  * `eth0.10` $\rightarrow$ VLAN 10 Gateway (`10.10.1.254`)
+  * `eth0.20` $\rightarrow$ VLAN 20 Gateway (`10.20.1.254`)
+* Paketler tek bir kablodan tren vagonları gibi gider, yönlendirilir ve aynı kablodan geri döner.
+
+![Yöntem 2: Router-on-a-Stick (802.1Q Trunk ile Tek Kablo)](../../assets/inter_vlan_yontem2_roas.jpg)
+
+---
+
+### 3. Yöntem: Layer 3 Switch (Dışarıda Router Yok! Dahili SVI Yönlendirmesi)
+
+Modern kurumsal şirketlerin ve veri merkezlerinin standardıdır:
+* Masanın üzerine harici bir Router kutusu **konulmaz**; Switch ile Router arasındaki dış kablolar tamamen çöpe atılır!
+* Kullanılan anahtar **Layer 3 Switch (Çok Katmanlı Anahtar)**'dır; yani hem Katman 2 anahtarlamayı hem de Katman 3 IP yönlendirmeyi yapabilen akıllı bir cihazdır.
+* Switch kendi işletim sistemi içinde her VLAN için sanal bir yönlendirici kapısı açar (**SVI - Switch Virtual Interface**: `interface Vlan10` ve `interface Vlan20`).
+* Paketler hiçbir dış kabloya çıkmadan, switch'in kendi içindeki **ASIC işlemci çipinde** saniyede milyonlarca paket hızında donanımsal olarak yönlendirilir!
+
+![Yöntem 3: Layer 3 Switch (SVI ile Donanımsal Yönlendirme)](../../assets/inter_vlan_yontem3_l3switch.jpg)
+
+---
+
 ## 📌 Teorik Bağlantı (Ana Rehber)
 Bu lab aşağıdaki rehber bölümlerini uygulamaya döker:
 * [Modül 1 / Madde 4: Default Gateway (Varsayılan Ağ Geçidi)](../../README.md#4-default-gateway-varsayılan-ağ-geçidi)
@@ -14,19 +59,58 @@ Bu lab aşağıdaki rehber bölümlerini uygulamaya döker:
 
 ---
 
-## 🏗️ Laboratuvar Mimarisi
+## 🏗️ Laboratuvar Mimarisi (Fiziksel Kablo Zinciri & Paket Akışı)
+
+### 🏢 Gerçek Hayat Benzetmesi (İki Ayrı Bina ve Güvenlik Geçiş Kulübesi):
+* **A Binası (VLAN 10):** Personelin çalıştığı bina. İçinde kendi kat koridoru (Sanal Switch 1) var.
+* **B Binası (VLAN 20):** Muhasebe kasalarının olduğu bina. İçinde kendi kat koridoru (Sanal Switch 2) var.
+* **Duvar:** İki bina arasında fiziksel hiçbir doğrudan kapı yoktur! (İzolasyon)
+* **Güvenlik Kulübesi (Core Router):** İki binanın tam ortasına konulmuştur:
+  * **1. Kapısı (`eth0`):** A Binasının koridoruna açılır (`10.10.1.254`).
+  * **2. Kapısı (`eth1`):** B Binasının koridoruna açılır (`10.20.1.254`).
+  * Memur (**`ip_forward=1`**), mektubu 1. kapıdan alıp masanın üzerinden 2. kapıya uzatır!
 
 ```text
-[ ahmet-pc ] (10.10.1.45)
-     │  (vlan10_personel)
-     ▼
-[ core-router ]
-  ├── eth0: 10.10.1.254 (Personel Ağı Kapısı)
-  └── eth1: 10.20.1.254 (Sunucu Ağı Kapısı)
-     │  (vlan20_sunucu)
-     ▼
-[ gizli-muhasebe ] (10.20.1.50)
+  [ 💻 AHMET'İN BİLGİSAYARI ] (IP: 10.10.1.45)
+             │
+             │ (1. Sanal Kablo: Ahmet'in bilgisayarından çıkar)
+             ▼
+  ┌────────────────────────────────────────────────────────┐
+  │   vlan10_personel KÖPRÜSÜ (1. Sanal Switch)            │
+  │   (Personel Odasının Ortak Switch Kutusu)              │
+  └──────────────────────────┬─────────────────────────────┘
+                             │
+                             │ (2. Sanal Kablo: Switch'ten Router'a gider)
+                             ▼
+  ┌────────────────────────────────────────────────────────┐
+  │                   CORE-ROUTER                          │
+  │            (İki Kapılı Yönlendirici Kutu)              │
+  │                                                        │
+  │   🚪 eth0 Kapısı: 10.10.1.254 (VLAN 10 Ağ Geçidi)      │
+  │          │                                             │
+  │          │ ⚡ Çekirdek Yönlendirme (net.ipv4.ip_forward=1)│
+  │          ▼                                             │
+  │   🚪 eth1 Kapısı: 10.20.1.254 (VLAN 20 Ağ Geçidi)      │
+  └──────────────────────────┬─────────────────────────────┘
+                             │
+                             │ (3. Sanal Kablo: Router'dan 2. Switch'e gider)
+                             ▼
+  ┌────────────────────────────────────────────────────────┐
+  │   vlan20_sunucu KÖPRÜSÜ (2. Sanal Switch)              │
+  │   (Muhasebe Odasının Ortak Switch Kutusu)              │
+  └──────────────────────────┬─────────────────────────────┘
+                             │
+                             │ (4. Sanal Kablo: Switch'ten Muhasebeye gider)
+                             ▼
+  [ 🖥️ GİZLİ MUHASEBE SUNUCUSU ] (IP: 10.20.1.50)
 ```
+
+### 📦 Bir Paketin Adım Adım Yolculuğu (1 ➔ 2 ➔ 3 ➔ 4):
+1. **Ahmet (`10.10.1.45`)** paketi gönderir $\rightarrow$ Paket **1. kabloyla** `vlan10` switch'ine girer.
+2. `vlan10` switch'i bakar: *"Bu paket muhasebeye gidecek ama o benim odamda değil, çıkış kapısına yollayayım"* der ve **2. kabloyla** paketi Router'ın **`eth0` (`10.10.1.254`)** kapısına atar.
+3. **Core Router** paketi inceler: *"Hedef 10.20.1.50, bu benim diğer kapım olan `eth1` tarafında!"* der ve paketi kendi içinden geçirir (**`net.ipv4.ip_forward=1`**).
+4. Paket **3. kabloyla** Router'ın **`eth1`** kapısından çıkarak `vlan20` switch'ine basılır.
+5. `vlan20` switch'i de paketi **4. kabloyla** hedef olan **Gizli Muhasebe Sunucusuna (`10.20.1.50`)** teslim eder!
 
 ---
 
