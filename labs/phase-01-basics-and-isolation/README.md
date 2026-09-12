@@ -40,6 +40,8 @@ Port Numaraları│ [1] [2] [3] [4] ... [11] [12] [13] ... [24]              │
 * İki kutu arasına hiçbir kablo çekilmiyordu.
 * **Büyük İsraf:** Muhasebede sadece 2 sunucu varken koca 24 portlu kutunun 22 deliği boş kalıyor; binlerce dolar masraf ve kablo karmaşası oluyordu.
 
+![VLAN Öncesi Geleneksel Fiziksel İzolasyon (İki Ayrı Switch Kutusu)](../../assets/vlan_oncesi_fiziksel_izolasyon.jpg)
+
 ---
 
 #### ✂️ C. VLAN Nasıl Devreye Girdi? (Yazılımla Çelik Duvar Örmek):
@@ -53,6 +55,8 @@ Ağ uzmanı switch'in komut satırına girer:
 Switch'in anakartındaki işlemci çipi (ASIC) artık bir güvenlik görevlisi gibi çalışır. Ahmet Port 1'den bir veri fırlattığında çip der ki:  
 *"Bu elektrik sinyali Port 1'den geldi. Port 1 ise VLAN 10 odasına ait. Ben bu paketi Port 11'e (Muhasebeye) ASLA GEÇİRMEM!"*  
 Yani aynı metal kutunun içinde olmalarına rağmen elektrik sinyalleri mantıksal olarak birbirinden tamamen yalıtılır.
+
+![VLAN Sonrası Tek Bir Switch Üzerinde Mantıksal İzolasyon (ASIC Çipi ve VLAN 10/20)](../../assets/vlan_sonrasi_mantiksal_izolasyon.jpg)
 
 ---
 
