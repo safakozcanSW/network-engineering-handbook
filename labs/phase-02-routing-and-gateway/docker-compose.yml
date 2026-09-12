@@ -1,0 +1,54 @@
+services:
+  core-router:
+    image: alpine:latest
+    container_name: core-router
+    hostname: core-router
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv4.ip_forward=1
+    command: sh -c "apk add --no-cache iproute2 iputils iptables tcpdump && sleep infinity"
+    networks:
+      vlan10_personel:
+        ipv4_address: 10.10.1.254
+      vlan20_sunucu:
+        ipv4_address: 10.20.1.254
+
+  ahmet-pc:
+    image: alpine:latest
+    container_name: ahmet-pc
+    hostname: ahmet-pc
+    cap_add:
+      - NET_ADMIN
+    command: sh -c "apk add --no-cache iproute2 iputils traceroute bind-tools net-tools curl && sleep infinity"
+    networks:
+      vlan10_personel:
+        ipv4_address: 10.10.1.45
+
+  gizli-muhasebe:
+    image: alpine:latest
+    container_name: gizli-muhasebe
+    hostname: gizli-muhasebe
+    cap_add:
+      - NET_ADMIN
+    command: sh -c "apk add --no-cache iproute2 iputils traceroute bind-tools net-tools curl && sleep infinity"
+    networks:
+      vlan20_sunucu:
+        ipv4_address: 10.20.1.50
+
+networks:
+  vlan10_personel:
+    name: p2_vlan10_personel
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.10.1.0/24
+
+  vlan20_sunucu:
+    name: p2_vlan20_sunucu
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.20.1.0/24

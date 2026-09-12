@@ -1,0 +1,31 @@
+services:
+  company-dns:
+    image: coredns/coredns:latest
+    container_name: company-dns
+    hostname: company-dns
+    command: -conf /etc/coredns/Corefile
+    volumes:
+      - ./coredns:/etc/coredns:ro
+    networks:
+      corp_net:
+        ipv4_address: 10.20.1.10
+
+  ahmet-pc:
+    image: alpine:latest
+    container_name: ahmet-pc
+    hostname: ahmet-pc
+    dns:
+      - 10.20.1.10
+    command: sh -c "apk add --no-cache bind-tools curl tcpdump && sleep infinity"
+    networks:
+      corp_net:
+        ipv4_address: 10.20.1.45
+
+networks:
+  corp_net:
+    name: p4_corp_net
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.20.1.0/24

@@ -1,0 +1,14 @@
+$ORIGIN sirket.local.
+@   IN  SOA ns1.sirket.local. admin.sirket.local. (
+        2026091201 ; Serial
+        7200       ; Refresh
+        3600       ; Retry
+        1209600    ; Expire
+        3600       ; Negative Cache TTL
+)
+
+@           IN  NS      ns1.sirket.local.
+ns1         IN  A       10.20.1.10
+portal      IN  A       10.20.1.50
+muhasebe    IN  A       10.20.1.50
+api         IN  CNAME   portal.sirket.local.

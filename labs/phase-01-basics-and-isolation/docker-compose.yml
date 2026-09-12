@@ -1,0 +1,46 @@
+services:
+  ahmet-pc:
+    image: alpine:latest
+    container_name: ahmet-pc
+    hostname: ahmet-pc
+    command: sh -c "apk add --no-cache iproute2 iputils bind-tools net-tools curl && sleep infinity"
+    networks:
+      vlan10_personel:
+        ipv4_address: 10.10.1.45
+
+  mehmet-pc:
+    image: alpine:latest
+    container_name: mehmet-pc
+    hostname: mehmet-pc
+    command: sh -c "apk add --no-cache iproute2 iputils bind-tools net-tools curl && sleep infinity"
+    networks:
+      vlan10_personel:
+        ipv4_address: 10.10.1.46
+
+  gizli-muhasebe:
+    image: alpine:latest
+    container_name: gizli-muhasebe
+    hostname: gizli-muhasebe
+    command: sh -c "apk add --no-cache iproute2 iputils bind-tools net-tools curl && sleep infinity"
+    networks:
+      vlan20_sunucu:
+        ipv4_address: 10.20.1.50
+
+networks:
+  vlan10_personel:
+    name: vlan10_personel
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.10.1.0/24
+          gateway: 10.10.1.1
+
+  vlan20_sunucu:
+    name: vlan20_sunucu
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.20.1.0/24
+          gateway: 10.20.1.1

@@ -1,0 +1,28 @@
+services:
+  web-service:
+    image: nginx:alpine
+    container_name: web-service
+    ports:
+      - "8080:80"
+    networks:
+      nat_lab_net:
+        ipv4_address: 172.28.0.10
+
+  curler:
+    image: alpine:latest
+    container_name: curler
+    hostname: curler
+    command: sh -c "apk add --no-cache curl iptables && sleep infinity"
+    networks:
+      nat_lab_net:
+        ipv4_address: 172.28.0.20
+
+networks:
+  nat_lab_net:
+    name: nat_lab_net
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1

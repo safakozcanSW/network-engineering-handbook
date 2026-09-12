@@ -1,0 +1,12 @@
+sirket.local:53 {
+    file /etc/coredns/db.sirket.local
+    log
+    errors
+}
+
+.:53 {
+    forward . 1.1.1.1 8.8.8.8
+    log
+    errors
+    cache 30
+}

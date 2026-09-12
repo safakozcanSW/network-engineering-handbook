@@ -2,10 +2,14 @@
 
 Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik protokollerine, yönlendirmeden modern dağıtık sistem mimarilerine kadar uzanan kavramları **teorik temeller**, **teknik parametreler**, **günlük hayat analojileri** ve **sektörel kullanım senaryoları** ile ele almaktadır.
 
+> 🧪 **Uygulamalı Laboratuvarlar (Docker Labs):**  
+> Bu rehberdeki tüm kavramları Docker üzerinde canlı olarak test etmek için hazırlanmış 6 fazlık adım adım uygulamalı laboratuvar serisi için [**`labs/` dizinine göz atabilirsiniz**](labs/README.md).
+
 ---
 
 ## 📑 İçindekiler
 
+- [🧪 Uygulamalı Docker Ağ Laboratuvarları (Hands-on Labs)](labs/README.md)
 - [Özet Referans Tablosu (Hızlı Bakış)](#-özet-referans-tablosu-hızlı-bakış)
 - [Modül 1: Ağın Kimlik ve Adresleme Temelleri](#-modül-1-ağın-kimlik-ve-adresleme-temelleri)
   - [1. MAC Adresi (Media Access Control)](#1-mac-adresi-media-access-control)

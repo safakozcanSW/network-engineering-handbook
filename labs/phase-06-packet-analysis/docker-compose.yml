@@ -1,0 +1,30 @@
+services:
+  target-web:
+    image: nginx:alpine
+    container_name: target-web
+    hostname: target-web
+    networks:
+      sniff_net:
+        ipv4_address: 10.30.1.50
+
+  client-pc:
+    image: alpine:latest
+    container_name: client-pc
+    hostname: client-pc
+    cap_add:
+      - NET_ADMIN
+    command: sh -c "apk add --no-cache tcpdump curl netcat-openbsd iproute2 && sleep infinity"
+    volumes:
+      - ./captures:/captures
+    networks:
+      sniff_net:
+        ipv4_address: 10.30.1.45
+
+networks:
+  sniff_net:
+    name: p6_sniff_net
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.30.1.0/24
