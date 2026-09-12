@@ -154,6 +154,53 @@ Bu rehber; bilgisayar ağlarının temel adresleme mekanizmalarından güvenlik 
     * **NAT Zorunluluğunu Kaldırır:** Her cihaz doğrudan genel internette uçtan uca (*End-to-End*) benzersiz bir küresel IP alabilir.
     * **Dahili Güvenlik:** Veri şifreleme standardı olan **IPsec** doğrudan protokolün içine gömülüdür.
     * **Otomatik Yapılandırma (SLAAC):** Cihazlar ağa takıldığında bir DHCP sunucusuna dahi ihtiyaç duymadan kendi IP adreslerini otomatik olarak türetebilir (*Stateless Address Autoconfiguration*).
+* **Cihazlarda IPv4 ve IPv6 Arasında Geçiş Nasıl Yapılır? (Dual-Stack, Öncelik & Kapatma):**
+
+  > ❓ **"Bir cihaz ya IPv4 ya da IPv6 mı kullanmak zorundadır?"**  
+  > **Hayır!** Günümüzdeki tüm modern işletim sistemleri (Windows, Linux, macOS, Android, iOS) ve modemler **Dual-Stack (Çift Yığın)** mimarisine sahiptir. Yani bir ağ kartı aynı anda **hem bir IPv4 hem de bir IPv6 adresi** taşıyabilir ve ikisini aynı anda sorunsuz çalıştırabilir.
+
+  #### 1. Otomatik Geçiş Mekanizması: *Happy Eyeballs (RFC 8305)*
+  Tarayıcınız bir web sitesine (örneğin `google.com`) gitmek istediğinde işletim sistemi DNS'e sorar ve hem IPv4 (A) hem de IPv6 (AAAA) adresini alır.
+  * Tarayıcı milisaniyeler arayla her iki protokole de aynı anda bağlanmayı dener (**Happy Eyeballs algoritması**).
+  * Hangi hat (IPv4 mü yoksa IPv6 mı) daha hızlı el sıkışırsa, bağlantı kullanıcıya hiçbir şey hissettirmeden o protokol üzerinden akar.
+
+  #### 2. Cihaz Seviyesinde Manuel Geçiş (IPv6'yı Kapatma veya IPv4'e Zorlama):
+  Bazen eski VPN yazılımları, şirket proxy'leri veya ISP kaynaklı IPv6 gecikmeleri nedeniyle bir protokolü tamamen kapatıp diğerine geçmek gerekebilir:
+
+  * **Windows Üzerinde Geçiş:**
+    * **Arayüz ile:** `Win + R` tuşlarına basıp `ncpa.cpl` yazın $\rightarrow$ Ağ kartınıza sağ tıklayıp **Özellikler** deyin $\rightarrow$ Listeden **"İnternet Protokolü Sürüm 6 (TCP/IPv6)"** kutucuğunun işaretini kaldırıp Tamam'a basın. Artık Windows yalnızca IPv4 üzerinden haberleşir.
+    * **PowerShell ile (Yönetici):**
+      ```powershell
+      # Belirli bir kartta IPv6'yı devre dışı bırakma (IPv4'e zorlama):
+      Disable-NetAdapterBinding -Name "Wi-Fi" -ComponentID ms_tcpip6
+
+      # Tekrar aktif etme (Dual-Stack'e dönüş):
+      Enable-NetAdapterBinding -Name "Wi-Fi" -ComponentID ms_tcpip6
+      ```
+
+  * **Linux Üzerinde Geçiş:**
+    * **Çekirdek Düzeyinde (sysctl):**
+      ```bash
+      # IPv6'yı tamamen kapatıp sistemi sadece IPv4'e zorlama:
+      sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+      sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+
+      # IPv6'yı tekrar açma (Dual-Stack):
+      sudo sysctl -w net.ipv6.conf.all.disable_ipv6=0
+      sudo sysctl -w net.ipv6.conf.default.disable_ipv6=0
+      ```
+    * **Komut Seviyesinde Tek Seferlik Tercih:**
+      Sistemi değiştirmeden sadece tek bir komutta protokol seçebilirsiniz:
+      ```bash
+      curl -4 https://icanhazip.com   # İsteği sadece IPv4 ile atar
+      curl -6 https://icanhazip.com   # İsteği sadece IPv6 ile atar
+      ping -4 google.com              # Yalnızca IPv4 adresine ping atar
+      ping -6 google.com              # Yalnızca IPv6 adresine ping atar
+      ```
+
+  * **Modem / ISP Seviyesinde Geçiş:**
+    * Modem yönetim arayüzünde *Gelişmiş WAN Ayarları* altında Bağlantı Tipi genellikle **"IPv4 / IPv6 Dual Stack"**, **"Sadece IPv4"** veya **"Sadece IPv6"** olarak seçilebilir.
+    * ⚠️ **Önemli Kural:** Bilgisayarınızda IPv6 açık olsa dahi, evdeki modeminiz veya internet servis sağlayıcınız (Türk Telekom, Turkcell vb.) aboneliğinize IPv6 tanımlamadıysa dış internete yalnızca IPv4 üzerinden çıkabilirsiniz.
 * **Temel IP Blokları ve Sınıflandırma:**
   * **Public IP (Genel):** İnternette yönlendirilebilen, ICANN/RIPE gibi uluslararası kurumlar tarafından ISP'lere ve şirketlere tahsis edilen küresel IP'lerdir.
   * **Private IP (Özel - RFC 1918):** İnternete doğrudan çıkamayan, ev ve şirket içi yerel ağlara ayrılmış bloklardır (*RFC: İnternet standartlarını belirleyen resmi teknik şartnamelerdir*):
