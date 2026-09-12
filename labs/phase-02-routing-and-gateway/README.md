@@ -199,11 +199,16 @@ traceroute to 10.20.1.50 (10.20.1.50), 30 hops max, 46 byte packets
 
 ---
 
-### 5. Adım: "Kabloyu Kesmek" — IP Forwarding Kapatma Deneyi
-Bir yönlendiricinin paketleri nasıl anında kestiğini görmek için Core Router üzerinde çekirdek yönlendirmesini sıfırlayalım:
+### 5. Adım: "Kabloyu Kesmek" — Yönlendirmeyi Kapatma Deneyi
+
+Bir yönlendiricinin trafiği nasıl kestiğini canlı görmek için iki farklı yöntem kullanabilirsiniz:
+
+#### 🛡️ Yöntem A: Firewall Kuralları ile Trafiği Kesmek (`iptables` - Önerilen)
+Gerçek hayatta güvenlik duvarları paket iletimini böyle keser. Hiçbir ayar değiştirmeden doğrudan çalıştırabilirsiniz:
 
 ```bash
-docker exec -it core-router sysctl -w net.ipv4.ip_forward=0
+# 1. Yönlendirmeyi engelle (Tüm geçiş trafiğini çöpe at):
+docker exec -it core-router iptables -P FORWARD DROP
 ```
 
 Şimdi Ahmet tekrar ping atsın:
@@ -212,11 +217,32 @@ docker exec -it ahmet-pc ping -c 2 -W 2 10.20.1.50
 ```
 *(Paketler anında düşer ve `%100 packet loss` olur!)*
 
-Geri açmak için:
+Tekrar izin vermek için:
 ```bash
+docker exec -it core-router iptables -P FORWARD ACCEPT
+```
+*(Ping anında tekrar kesintisiz akmaya başlar!)*
+
+---
+
+#### ⚙️ Yöntem B: Çekirdek Seviyesinde IP Forwarding Kapatmak (`sysctl`)
+> ⚠️ **`Read-only file system` Hatası Neden Alınır?**  
+> Docker güvenlik gerekçesiyle container'ların ana makinenin Linux çekirdek parametrelerini değiştirmesini engellemek için `/proc/sys` dizinini varsayılan olarak **salt okunur (Read-only)** bağlar.  
+> Bu komutun çalışabilmesi için `docker-compose.yml` içindeki `core-router` servisine `privileged: true` yetkisi eklenmiştir.
+
+Container'ı güncel yetkiyle başlatmak için:
+```bash
+docker compose up -d
+```
+
+Ardından çekirdek parametresini anlık olarak kapatıp açabilirsiniz:
+```bash
+# Kapat:
+docker exec -it core-router sysctl -w net.ipv4.ip_forward=0
+
+# Aç:
 docker exec -it core-router sysctl -w net.ipv4.ip_forward=1
 ```
-*(Ping anında tekrar akmaya başlar!)*
 
 ---
 

@@ -3,6 +3,7 @@ services:
     image: alpine:latest
     container_name: core-router
     hostname: core-router
+    privileged: true
     cap_add:
       - NET_ADMIN
     sysctls:
