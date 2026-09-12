@@ -2,6 +2,8 @@
 
 Faz 1'de iki farklı alt ağın (`vlan10` ve `vlan20`) birbirinden tamamen izole olduğunu ve doğrudan konuşamadığını gördük. Bu laboratuvarda; araya çift ağ kartına (vNIC) sahip bir **Linux Core Router** yerleştirecek, **IP Yönlendirme (IP Forwarding)** mekanizmasını aktif edecek ve paketlerin ağlar arasında sekerek hedefe nasıl ulaştığını **Traceroute** ile adım adım izleyeceğiz.
 
+![Inter-VLAN Yönlendirme ve Çift Ağ Kartlı Linux Core Router Mimarisi](../../assets/inter_vlan_routing.jpg)
+
 ---
 
 ## 📌 Teorik Bağlantı (Ana Rehber)
