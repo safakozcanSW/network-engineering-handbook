@@ -79,98 +79,95 @@ ip link show eth3
 
 ## 02. DHCP DORA Sürecini ve Parametrelerini İnceleme
 
-Cihazınızın ağa ilk katıldığında DHCP sunucusundan nasıl parametre aldığını görmek için:
+Cihazınızın ağa ilk katıldığında DHCP sunucusundan (modeminizden) nasıl parametre aldığını görmek için:
 
 ```bash
-# 1. NetworkManager kullanılıyorsa son DHCP olaylarını filtrele:
-journalctl -u NetworkManager --grep="DHCP4" -n 25 --no-pager
+# 1. DHCP tarafından atanan DNS sunucularını incele:
+cat /etc/resolv.conf
 
-# 2. Sistemdeki kayıtlı DHCP kira dosyasını (Option'lar dahil) incele:
-cat /var/lib/NetworkManager/*.lease 2>/dev/null || cat /var/lib/dhcp/dhclient*.leases 2>/dev/null
+# Çıktı:
+# nameserver 10.255.255.254
+# search home
 ```
 
-> 🔍 **Örnek Çıktıda Neler Görünür?**
-> - `fixed-address 192.168.1.50;` $\rightarrow$ Size atanan IP
-> - `option subnet-mask 255.255.255.0;` $\rightarrow$ Alt ağ maskesi
-> - `option routers 192.168.1.1;` $\rightarrow$ Option 3 (Default Gateway)
-> - `option domain-name-servers 192.168.1.1, 8.8.8.8;` $\rightarrow$ Option 6 (DNS)
-> - `lease time 86400;` $\rightarrow$ 24 saatlik kira süresi
+> 🔍 **Parametrelerin Anlamı:**
+> * **`nameserver 10.255.255.254` (DHCP Option 6 - DNS):** WSL2 ve Windows'un alan adlarını çözümlemek için kullandığı yerel DNS köprüsüdür.
+> * **`search home` (DHCP Option 15 - Domain Search):** Evinizdeki modemin dağıttığı yerel alan adı sonekidir (`.home`).
+> * **Neden NetworkManager Logu Yok?** Mirrored modda gerçek DHCP anlaşmasını (DORA) Windows'un DHCP istemcisi modemle tamamlar ve elde ettiği parametreleri anında Linux çekirdeğine enjekte eder. (Windows PowerShell'de `ipconfig /all` yazarak modemin dağıttığı kira süresini görebilirsiniz).
 
 ---
 
 ## 03. IP Adresini (IPv4 & IPv6) Doğrulama
 
-DHCP'den aldığınız mantıksal yönlendirilebilir Katman 3 adresini incelemek için:
+Modeminizin DHCP sunucusundan aldığınız mantıksal yönlendirilebilir Katman 3 adresini incelemek için:
 
 ```bash
-# Hızlı ve özet görünüm:
-ip -br addr show
+# Aktif ağ kartınızın (eth3) adreslerini listele:
+ip addr show eth3
 
-# Detaylı IPv4 ve IPv6 adreslerini listele:
-ip addr show eth0
+# Terminalinizdeki Gerçek Çıktı:
+# 6: eth3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 ...
+#     link/ether 50:2e:91:64:40:5e brd ff:ff:ff:ff:ff:ff
+#     inet 192.168.1.89/24 brd 192.168.1.255 scope global noprefixroute eth3
+#     inet6 fe80::8d02:c40b:b42e:fbc9/64 scope link nodad noprefixroute
 ```
 
-```bash
-# IPv6'yı anlık kapatıp sadece IPv4'e zorlama testi:
-sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
-curl -4 https://icanhazip.com
-
-# Tekrar Dual-Stack moduna alma:
-sudo sysctl -w net.ipv6.conf.all.disable_ipv6=0
-```
+> 🔍 **Çıktı Analizi:**
+> * **`192.168.1.89` (IPv4 Private IP):** Evinizdeki modemin bilgisayarınıza özel olarak tahsis ettiği C Sınıfı yerel IP adresidir (RFC 1918).
+> * **`/24` CIDR Notasyonu:** Alt ağ maskesini (`255.255.255.0`) temsil eder.
+> * **`fe80::...` (IPv6 Link-Local):** Aynı yerel ağdaki cihazların modeme ihtiyaç duymadan doğrudan konuşabilmesi için üretilen yerel IPv6 adresidir.
 
 ---
 
 ## 04. Subnet Mask, CIDR ve Ağ Sınırlarını Hesaplama
 
-Ağ kartınızın hangi mahallede (Subnet) yer aldığını görmek için:
+Ağ kartınızın hangi mahallede (Subnet) yer aldığını görmek ve sınırlarını hesaplamak için:
 
 ```bash
 # Alt ağ maskesini incele:
-ip -4 addr show eth0 | grep inet
+ip -4 addr show eth3 | grep inet
 
-# Çıktı: inet 192.168.1.50/24 brd 192.168.1.255 scope global dynamic eth0
+# Çıktı: inet 192.168.1.89/24 brd 192.168.1.255 scope global noprefixroute eth3
 ```
 
-> 🧮 **Hesaplama:**
-> - `/24` $\implies$ $255.255.255.0$
-> - **Ağ Adı (Network ID):** `192.168.1.0` (İlk adres - cihaza verilemez)
-> - **Kullanılabilir Cihaz IP Aralığı:** `192.168.1.1 - 192.168.1.254` (254 cihaz)
-> - **Broadcast (Yayın) Adresi:** `192.168.1.255` (Son adres - cihaza verilemez)
-
-Eğer sisteminizde `ipcalc` aracı yüklüyse (`sudo apt install ipcalc`):
-```bash
-ipcalc 192.168.1.50/24
-```
+> 🧮 **Ağ Mühendisliği Hesaplaması (/24 Alt Ağı):**
+> - **CIDR:** `/24` $\implies$ Alt ağ maskesi: `255.255.255.0` ($24$ bit ağ, $8$ bit host).
+> - **Toplam IP Sayısı:** $2^8 = 256$ adet adres.
+> - **Ağ Adı (Network ID):** `192.168.1.0` (İlk adres - hiçbir cihaza verilemez, mahallenin adıdır).
+> - **Modem / Gateway:** `192.168.1.1` (Genelde ilk kullanılabilir IP modeme verilir).
+> - **Kullanılabilir Cihaz IP Aralığı:** `192.168.1.1` - `192.168.1.254` (Maksimum 254 cihaz aynı anda bağlanabilir).
+> - **Sizin Bilgisayarınız:** `192.168.1.89` (Bu aralığın içindedir).
+> - **Broadcast (Yayın) Adresi:** `192.168.1.255` (Son adres - tüm mahalleye anons hoparlörüdür).
 
 ---
 
 ## 05. Default Gateway (Varsayılan Ağ Geçidi) İnceleme
 
-Yerel ağ dışındaki hedeflere (internete) çıkarken kullanılan rotayı kontrol etmek için:
+Yerel ağ dışındaki hedeflere (internete, Google'a) çıkarken trafiğin yönlendirildiği kapıyı görmek için:
 
 ```bash
 # Yönlendirme tablosunu görüntüle:
-ip route show
+ip route
 
-# Yalnızca varsayılan ağ geçidini filtrele:
-ip route show default
-# Çıktı: default via 192.168.1.1 dev eth0 proto dhcp metric 100
+# Terminalinizdeki Gerçek Çıktı:
+# default via 192.168.1.1 dev eth3 proto kernel metric 30
+# 192.168.1.0/24 dev eth3 proto kernel scope link metric 286
+# 192.168.1.1 dev eth3 proto kernel scope link metric 30
 ```
 
-> ⚠️ **Gateway Olmazsa Ne Olur Testi?**
+> 🔍 **Yönlendirme Tablosunun Satır Satır Analizi:**
+> 1. **`default via 192.168.1.1 dev eth3 metric 30`:**  
+>    Linux çekirdeğine der ki: *"Eğer gideceğin IP adresi yerel ağında (`192.168.1.0/24`) değilse, paketi `eth3` kartından çıkarıp evindeki modem olan `192.168.1.1` adresine teslim et!"*
+> 2. **`192.168.1.0/24 dev eth3 proto kernel scope link`:**  
+>    *"Eğer hedef IP `192.168.1.x` ile başlıyorsa modeme sormana gerek yok, doğrudan kablo/Wi-Fi üzerinden komşu cihaza gönder."*
+> 
 > ```bash
-> # Geçici olarak varsayılan ağ geçidini silin:
-> sudo ip route del default
+> # İnternet rotasını sorgula:
+> ip route get 8.8.8.8
+> # Çıktı: 8.8.8.8 via 192.168.1.1 dev eth3 src 192.168.1.89 ...
 > 
-> # Yerel ağdaki cihaza ping atın (ÇALIŞIR):
-> ping -c 2 192.168.1.1
-> 
-> # İnternete ping atın (HATA VERİR: Network is unreachable):
+> # Google'a doğrudan ping at:
 > ping -c 2 8.8.8.8
-> 
-> # Ağ geçidini geri ekleyin:
-> sudo ip route add default via 192.168.1.1 dev eth0
 > ```
 
 ---
@@ -199,22 +196,38 @@ sudo arping -D -I eth0 -c 2 192.168.1.50
 
 ## 07. DNS (Alan Adı Çözümleme) Testleri
 
-İnsanların okuduğu alan adlarının sayısal IP'ye nasıl çevrildiğini hiyerarşik olarak test etmek için:
+İnsanların okuduğu alan adlarının (`google.com`) sayısal IP adresine nasıl çevrildiğini hiyerarşik olarak test etmek için:
 
 ```bash
-# 1. Sistemde tanımlı DNS sunucularını gör:
-cat /etc/resolv.conf
-# veya modern systemd sistemlerde:
+# 1. Sistemde tanımlı DNS sunucusunu doğrula:
 resolvectl status | grep "DNS Servers"
+# Terminalinizdeki Çıktı: DNS Servers: 10.255.255.254
 
-# 2. DNS A kaydını sorgula:
+# 2. Hızlıca DNS 'A' kaydını (IPv4 karşılığı) sorgula:
 dig google.com +noall +answer
+# Terminalinizdeki Çıktı:
+# google.com.    135    IN    A    172.217.171.78
 
-# 3. Kök sunuculardan başlayarak adım adım hiyerarşik çözümlemeyi izle (+trace):
+# 3. Kök sunuculardan başlayarak dünyanın DNS hiyerarşisini adım adım izle (+trace):
 dig google.com +trace
 ```
 
-> 🔍 **Neyi Görürsünüz?** İstek önce Kök DNS sunucularına (`.` - Root Servers), oradan TLD sunucularına (`.com`), en son Google'ın yetkili sunucularına (`ns1.google.com`) gider ve IP'yi teslim alır.
+> 🔍 **Canlı DNS Trace Çıktınızın Analizi (Dünya Genelinde Adım Adım Akış):**
+> 
+> 1. **1. Aşama - Kök Sunucular (Root DNS - `.`):**
+>    - Sorgunuz önce dünyadaki 13 kök DNS kümesine soruldu (`a.root-servers.net` – `m.root-servers.net`).
+>    - Kök sunucu dedi ki: *"Ben `google.com`'un IP'sini bilmem, ama `.com` uzantısından sorumlu TLD sunucularının listesi bende var, onlara git."*
+> 
+> 2. **2. Aşama - Üst Düzey Alan Adı Sunucuları (TLD - `.com`):**
+>    - Paket `.com` sunucularına gitti (`a.gtld-servers.net` – `m.gtld-servers.net`).
+>    - `.com` sunucusu dedi ki: *"Ben Google'ın kendi sunucusu değilim, ancak `google.com` alan adının yetkili sunucuları `ns1.google.com` - `ns4.google.com`'dur, git onlara sor."*
+> 
+> 3. **3. Aşama - Yetkili İsim Sunucuları (Authoritative DNS):**
+>    - Paket doğrudan Google'ın kendi sunucusuna ulaştı (`ns4.google.com - 216.239.38.10`).
+>    - Google'ın sunucusu kesin cevabı verdi:  
+>      **`google.com. 300 IN A 172.217.21.238`**
+> 
+> 💡 *Not: Çıktınızdaki `UDP setup with 2001:... network unreachable` uyarısı, ev internetinizde genel IPv6 internet çıkışı tanımlı olmadığı için sorgunun otomatik olarak IPv4'e düşüp başarıyla tamamlandığını gösterir.*
 
 ---
 
