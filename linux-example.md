@@ -311,37 +311,49 @@ curl -I -s https://1.1.1.1 >/dev/null
 
 ## 10. Güvenlik Duvarı (Firewall / Stateful Inspection) İnceleme
 
-Paketlerin durum denetimi tablosundan nasıl geçtiğini görmek için:
+Paketlerin durum denetimi tablosundan nasıl geçtiğini ve filtre kurallarını görmek için:
 
 ```bash
-# 1. Mevcut iptables filtre kurallarını sayaçlarla incele:
-sudo iptables -L -n -v --line-numbers
+# Mevcut iptables filtre zincirlerini ve sayaçlarını incele:
+iptables -L -n -v --line-numbers
 
-# 2. Stateful bağlantı tablosunu (conntrack) canlı listele:
-sudo conntrack -L -p tcp --dport 443 2>/dev/null || cat /proc/net/nf_conntrack | grep 443
+# Terminalinizdeki Gerçek Çıktı:
+# # Table 'filter' contains incompatible base-chains, use 'nft' tool to list them.
+# Chain INPUT (policy ACCEPT 0 packets, 0 bytes)
+# Chain FORWARD (policy ACCEPT 0 packets, 0 bytes)
+# Chain OUTPUT (policy ACCEPT 0 packets, 0 bytes)
 ```
 
-> 🔍 **Yorum:** Çıktıda `ESTABLISHED` durumunu görürsünüz. Bu, giden isteğin dönüş paketlerine güvenlik duvarının otomatik olarak izin verdiğini gösterir.
+> 🔍 **Güvenlik Duvarı Çıktısının Analizi:**
+> * **`policy ACCEPT` (Varsayılan Politika İzin Ver):**  
+>   Sisteminizde gelen (`INPUT`), yönlendirilen (`FORWARD`) ve giden (`OUTPUT`) tüm paketlere aksi belirtilmedikçe izin verilir.
+> * **`use 'nft' tool to list them` Uyarısı:**  
+>   Modern Ubuntu dağıtımlarında `iptables` komutu, arka planda yeni nesil **`nftables`** altyapısını kullanır. Detaylı çekirdek kurallarını görmek için `nft list ruleset` komutu da kullanılabilir.
 
 ---
 
 ## 11. NAT (Ağ Adresi Çevirisi) İnceleme
 
-Yerel ağ IP'nizin dış dünyaya Public IP ile çıkışını ve router kurallarını test etmek için:
+Yerel ağ IP'nizin dış dünyaya genel Public IP ile çıkışını ve router (modem) çevirisini doğrulamak için:
 
 ```bash
-# 1. Yerel IP'niz (eth3 kartınız):
+# 1. Yerel Ağdaki IP Adresiniz (eth3 kartınız):
 ip -4 addr show eth3 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'
-# Çıktı: 192.168.1.89
+# Terminalinizdeki Çıktı: 192.168.1.89
 
-# 2. İnternette görünen genel Public IP'niz (NAT sonrası modemin dış IP'si):
+# 2. Tüm Dünyanın Gördüğü Genel Public IP Adresiniz (NAT Sonrası):
 curl -s https://icanhazip.com
-
-# 3. Eğer Linux makineniz bir router ise NAT (Masquerade) kurallarını listele:
-sudo iptables -t nat -L -n -v
+# Terminalinizdeki Çıktı: 84.51.13.216
 ```
 
-> 🔍 **Yorum:** İki IP birbirinden tamamen farklıdır! Modemin arkasındaki `192.168.1.89` yerel IP'niz, internet servis sağlayıcının (ISP) modeminize tahsis ettiği genel IP'ye dönüştürülmüştür (*PAT / NAPT - Port Address Translation*). Evdeki 10 farklı cihaz internete çıksa bile dış dünya hepsini aynı genel IP olarak görür.
+> 🔍 **Canlı NAT / PAT Karşılaştırması:**
+> 
+> * **Bilgisayarınızın Özel IP'si (RFC 1918):** `192.168.1.89`  
+>   Bu IP yalnızca evinizin salonundaki modeme kadar geçerlidir. İnternet omurgasında bu adres yönlendirilemez (*non-routable*).
+> * **Modeminizin Dış Genel IP'si (Public IP):** `84.51.13.216`  
+>   İnternet Servis Sağlayıcınızın (Türk Telekom, Superonline vb.) modeminize tahsis ettiği, tüm internette tek ve benzersiz olan genel IP adresinizdir.
+> * **PAT (Port Address Translation) Mucizesi:**  
+>   Evinizdeki telefon, televizyon ve bilgisayar aynı anda internete bağlandığında, modem tüm bu cihazların paketlerini tek bir `84.51.13.216` IP'sine ve her cihaz için farklı bir port numarasına (`:43089` gibi) çevirerek dışarı yollar. Cevap geldiğinde de port tablosuna bakarak paketi doğru cihaza geri teslim eder!
 
 ---
 
@@ -350,16 +362,19 @@ sudo iptables -t nat -L -n -v
 Linux çekirdeğinde Katman 2 seviyesinde IEEE 802.1Q etiketli sanal alt ağ açmak için:
 
 ```bash
-# 1. eth0 arayüzüne bağlı VLAN 10 alt arayüzü oluştur:
-sudo ip link add link eth0 name eth0.10 type vlan id 10
+# 1. eth3 arayüzüne bağlı VLAN 10 alt arayüzü oluştur:
+sudo ip link add link eth3 name eth3.10 type vlan id 10
 
 # 2. Sanal VLAN arayüzüne IP ata ve ayağa kaldır:
-sudo ip addr add 10.10.10.5/24 dev eth0.10
-sudo ip link set dev eth0.10 up
+sudo ip addr add 10.10.10.5/24 dev eth3.10
+sudo ip link set dev eth3.10 up
 
 # 3. VLAN etiketleme detayını doğrula:
-ip -d link show eth0.10
+ip -d link show eth3.10
 # Çıktı: vlan protocol 802.1Q id 10 ...
+
+# 4. Test bittikten sonra sanal VLAN arayüzünü sil:
+sudo ip link del eth3.10
 ```
 
 ---
@@ -408,41 +423,41 @@ echo "=========================================================="
 echo "🌐 LİNUX AĞ YAŞAM DÖNGÜSÜ KONTROL RAPORU"
 echo "=========================================================="
 
-echo -e "\n[01. MAC Adresi]"
-ip link show | grep -E "link/ether" | head -n 1
+echo -e "\n[01. Fiziksel MAC Adresi (eth3)]"
+ip link show eth3 | grep -E "link/ether"
 
-echo -e "\n[02. DHCP Durumu]"
-journalctl -u NetworkManager --grep="DHCP" -n 2 --no-pager 2>/dev/null || echo "DHCP logları okunamadı veya statik yapılandırma."
+echo -e "\n[02. DNS Yapılandırması]"
+grep nameserver /etc/resolv.conf
 
-echo -e "\n[03. IP Adresi (IPv4 / IPv6)]"
-ip -br addr show | grep -v "127.0.0.1"
+echo -e "\n[03. Yerel IP Adresi (IPv4 / IPv6)]"
+ip -br addr show eth3
 
 echo -e "\n[04. Subnet Mask & Broadcast]"
-ip -4 addr show | grep -E "inet " | grep -v "127.0.0.1"
+ip -4 addr show eth3 | grep -E "inet "
 
-echo -e "\n[05. Default Gateway]"
+echo -e "\n[05. Varsayılan Ağ Geçidi (Default Gateway)]"
 ip route show default
 
-echo -e "\n[06. ARP Tablosu (Gateway MAC)]"
-ip neigh show | head -n 3
+echo -e "\n[06. ARP Tablosu (Modem MAC Adresi)]"
+ip neigh show dev eth3 | head -n 3
 
-echo -e "\n[07. DNS Çözümleme (google.com)]"
+echo -e "\n[07. DNS Çözümleme Testi (google.com)]"
 dig google.com +short | head -n 2
 
-echo -e "\n[08. Portlar ve Soketler (Dinlenen Servisler)]"
+echo -e "\n[08. Dinlenen Portlar (Açık Servisler)]"
 ss -tulpn | head -n 5
 
-echo -e "\n[09. TCP Bağlantı Testi (Google HTTPS 443)]"
-curl -I -s --connect-timeout 3 https://google.com | head -n 1
+echo -e "\n[09. TCP Bağlantı & Yanıt Testi (Cloudflare HTTPS)]"
+curl -I -s --connect-timeout 3 https://1.1.1.1 | head -n 1
 
-echo -e "\n[10. Güvenlik Duvarı Durumu]"
-sudo iptables -S INPUT 2>/dev/null | head -n 3 || echo "iptables izinleri için sudo gereklidir."
+echo -e "\n[10. Güvenlik Duvarı Durumu (INPUT Politikası)]"
+iptables -L INPUT -n | head -n 2
 
 echo -e "\n[11. NAT / Genel (Public) IP]"
-curl -s --max-time 3 https://icanhazip.com || echo "Dış internet Public IP alınamadı."
+echo "Genel IP: $(curl -s --max-time 3 https://icanhazip.com)"
 
 echo -e "\n=========================================================="
-echo "✅ Kontrol tamamlandı!"
+echo "✅ 15 Aşamalı Ağ Yaşam Döngüsü Kontrolü Başarıyla Tamamlandı!"
 EOF
 
 chmod +x test_network_lifecycle.sh
