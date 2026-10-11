@@ -374,23 +374,91 @@ Fiziksel dünyada her farklı departman veya güvenlik seviyesi için **ayrı ay
 
 ---
 
-### 🧪 Linux Üzerinde Canlı VLAN Testi:
+### 🧪 Linux Üzerinde Canlı Çift VLAN (VLAN 10 & VLAN 20) Testi:
+
+Bu senaryoda fiziksel tek kartımız olan `ens33` üzerinde aynı anda iki sanal ağ açacağız:
+* **VLAN 10 (Web / Ofis Ağı):** IP: `10.10.10.5/24`
+* **VLAN 20 (Veritabanı / Güvenli Yönetim Ağı):** IP: `10.20.20.5/24`
 
 ```bash
-# 1. ens33 kartınıza bağlı VLAN 10 alt arayüzü oluştur:
-ip link add link ens33 name ens33.10 type vlan id 10
+# ----------------------------------------------------
+# 1. VLAN 10 Alt Arayüzünü Oluştur ve IP Ata:
+# ----------------------------------------------------
+sudo ip link add link ens33 name ens33.10 type vlan id 10
+sudo ip addr add 10.10.10.5/24 dev ens33.10
+sudo ip link set dev ens33.10 up
 
-# 2. Sanal VLAN arayüzüne IP ata ve ayağa kaldır:
-ip addr add 10.10.10.5/24 dev ens33.10
-ip link set dev ens33.10 up
+# ----------------------------------------------------
+# 2. VLAN 20 Alt Arayüzünü Oluştur ve IP Ata:
+# ----------------------------------------------------
+sudo ip link add link ens33 name ens33.20 type vlan id 20
+sudo ip addr add 10.20.20.5/24 dev ens33.20
+sudo ip link set dev ens33.20 up
 
-# 3. VLAN etiketleme detayını (802.1Q) doğrula:
+# ----------------------------------------------------
+# 3. İki Arayüzün 802.1Q Etiketlerini ve Durumlarını Doğrula:
+# ----------------------------------------------------
 ip -d link show ens33.10
 # Çıktı: vlan protocol 802.1Q id 10 ...
+ip -d link show ens33.20
+# Çıktı: vlan protocol 802.1Q id 20 ...
 
-# 4. Test bittikten sonra sanal VLAN arayüzünü sil:
-ip link del ens33.10
+# ----------------------------------------------------
+# 4. Çekirdeğin Yönlendirme (Routing) Tablosunu İncele:
+# ----------------------------------------------------
+ip route show
+# Beklenen Çıktı:
+# 10.10.10.0/24 dev ens33.10 proto kernel scope link src 10.10.10.5
+# 10.20.20.0/24 dev ens33.20 proto kernel scope link src 10.20.20.5
+# 192.168.1.0/24 dev ens33 proto kernel scope link src 192.168.1.177
+
+# Hedef IP'ye göre trafiğin hangi VLAN etiketine gideceğini test et:
+ip route get 10.10.10.99   # ens33.10 üzerinden çıkar (VLAN 10 etiketiyle)
+ip route get 10.20.20.99   # ens33.20 üzerinden çıkar (VLAN 20 etiketiyle)
+
+# ----------------------------------------------------
+# 5. Temizlik (Test Bittikten Sonra Sanal Arayüzleri Sil):
+# ----------------------------------------------------
+sudo ip link del ens33.10
+sudo ip link del ens33.20
 ```
+
+> 🔍 **Canlı VLAN İnceleme Notu:**
+> * Fiziksel kartınız `ens33` hiçbir kesinti yaşamadan `192.168.1.177` IP'si ile internete bağlı kalmaya devam eder.
+> * Çekirdek, `10.10.10.0/24` ağına gidecek paketlerin başına anında **IEEE 802.1Q VLAN 10** etiketini, `10.20.20.0/24` ağına gidecek paketlerin başına ise **VLAN 20** etiketini ekleyerek aynı fiziksel kablodan (`ens33`) dışarı yollar!
+> * `ip link del` komutu verildiğinde sanal arayüzler bellekten kaldırılır; ana kartınız bundan hiç etkilenmez.
+
+---
+
+### ❓ Sık Sorulan Kritik Sorular:
+
+#### 1. Bu iki VLAN (VLAN 10 ve VLAN 20) birbirine erişebilir mi?
+* **Katman 2 (Switch / Donanım) Seviyesinde: KESİNLİKLE HAYIR!**
+  * Switch'in gözünde VLAN 10 ve VLAN 20, fiziksel olarak binanın iki farklı ucundaki iki ayrı kutu gibidir.
+  * VLAN 10'daki bir cihaz yayın (`Broadcast / ARP`) yaptığında, bu yayın VLAN 20'deki hiçbir cihaza **asla ulaşmaz**.
+* **Bu Linux Sunucusu Üzerindeki Durum (İstisnai Durum):**
+  * Eğer bu Linux makinesinin içinden `ping 10.20.20.5` veya `ping 10.10.10.5` derseniz ping **çalışır**. Çünkü Linux çekirdeği her iki IP'nin de "kendi yerel adresleri (*Local Scope*)" olduğunu bilir ve paketi fiziksel kabloya hiç çıkarmadan kendi içindeki `lo` (loopback) üzerinden geri döndürür.
+* **Farklı Cihazlar Birbirine Nasıl Erişir? (Inter-VLAN Routing):**
+  * VLAN 10'daki bir bilgisayar, VLAN 20'deki bir sunucuyla konuşmak isterse araya mutlaka bir **Katman 3 Yönlendirici (Router)** veya **L3 Switch** girmek zorundadır.
+  * Linux'ta bu makineyi router yapmak isterseniz:
+    ```bash
+    sudo sysctl -w net.ipv4.ip_forward=1
+    ```
+    komutuyla çekirdeğe "VLAN 10'dan gelen paketi al, VLAN 20'ye yönlendir" yetkisi verilir.
+  * Tam bu noktada **Firewall (iptables / nftables)** devreye sokulur:
+    * *"Muhasebe (VLAN 10), Veritabanına (VLAN 20) yalnızca 5432 (PostgreSQL) portundan erişebilsin, diğer her şey engellensin (DROP)!"*
+
+---
+
+#### 2. Bu ağlara bağlı cihazlar istek attığında pakette ne fark olur? (Wireshark / Başlık Farkı)
+
+| Özellik | Standart Ağ (Untagged - Access Port) | VLAN Ağı (Tagged - Trunk Port / 802.1Q) |
+| :--- | :--- | :--- |
+| **Paket Boyutu** | Standart Ethernet Çerçevesi (14 byte Header) | **+4 Byte Ekstra Etiket** (18 byte Header) |
+| **Etiket Durumu** | Etiket yok (*Untagged*). Normal PC VLAN'dan habersizdir. | Pakete **IEEE 802.1Q** başlığı enjekte edilir. |
+| **Paket İçeriği** | `[Hedef MAC] [Kaynak MAC] [EtherType 0x0800]` | `[Hedef MAC] [Kaynak MAC] [0x8100 TPID] [VLAN ID (10)] [EtherType]` |
+| **QoS Önceliği** | Genelde paket önceliği yoktur. | Etiketteki **PCP (3-bit)** alanı ile ses (VoIP) trafiğine VIP öncelik atanabilir. |
+| **Switch'in Davranışı** | Paketi portun sabit VLAN'ına kabul eder. | Gelen paketin üstündeki `VLAN ID`'ye bakar, sadece o VLAN'a izin verir. |
 
 ---
 
