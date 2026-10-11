@@ -35,11 +35,23 @@ Ağ kartınızın fiziksel donanım kimliğini görmek ve geçici olarak değiş
 ip link show
 
 # Örnek Çıktı:
+# 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+#    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
 # 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000
-#    link/ether 52:54:00:12:34:56 brd ff:ff:ff:ff:ff:ff
+#    link/ether 00:15:5d:2e:6a:8c brd ff:ff:ff:ff:ff:ff
+#    altname enx00155d2e6a8c
 ```
 
-> 🔍 **Yorum:** `link/ether 52:54:00:12:34:56` değeri fiziksel MAC adresinizdir. `brd ff:ff:ff:ff:ff:ff` ise yerel ağdaki Ethernet broadcast (genel anons) adresidir.
+> 🔍 **Çıktının Detaylı Analizi (Neden 2 Tane Var?):**
+> * **`1: lo` (Loopback - Yerel İç Döngü):**
+>   * Fiziksel bir donanım kartı veya kablo **DEĞİLDİR**.
+>   * İşletim sisteminin kendi kendine konuşmasını sağlayan sanal bir iç döngüdür (`localhost` / `127.0.0.1`).
+>   * Kendi bilgisayarınızda bir veritabanı veya web sunucusu çalıştırdığınızda paketler dışarı modeme veya kabloya çıkmaz, doğrudan `lo` üzerinden sistemin içine döner.
+>   * Donanımsal bir kart olmadığı için MAC adresi boştur: `link/loopback 00:00:00:00:00:00`.
+> * **`2: eth0` (Ethernet - Dış Dünyaya Bakan Gerçek Ağ Kartınız / NIC):**
+>   * Bilgisayarınızı modeme, yerel ağa ve internete bağlayan **asıl arayüz kartıdır**.
+>   * `link/ether 00:15:5d:2e:6a:8c` $\rightarrow$ Ağ kartınızın 48-bitlik fiziksel **MAC adresidir** (İlk 3 oktet olan `00:15:5d` Microsoft Hyper-V/WSL2 üretici kodudur).
+>   * `brd ff:ff:ff:ff:ff:ff` $\rightarrow$ Yerel ağdaki Katman 2 Ethernet genel yayın (*Broadcast*) adresidir.
 
 ```bash
 # 2. Geçici MAC Adresi Değiştirme (MAC Spoofing Testi):
