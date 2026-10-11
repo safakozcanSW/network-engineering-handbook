@@ -82,7 +82,7 @@ ip link show eth3
 Cihazınızın ağa ilk katıldığında DHCP sunucusundan (modeminizden) nasıl parametre aldığını görmek için:
 
 ```bash
-# 1. DHCP tarafından atanan DNS sunucularını incele:
+# 1. Linux tarafında DHCP ile atanan DNS ve arama alanını incele:
 cat /etc/resolv.conf
 
 # Çıktı:
@@ -90,10 +90,34 @@ cat /etc/resolv.conf
 # search home
 ```
 
-> 🔍 **Parametrelerin Anlamı:**
-> * **`nameserver 10.255.255.254` (DHCP Option 6 - DNS):** WSL2 ve Windows'un alan adlarını çözümlemek için kullandığı yerel DNS köprüsüdür.
-> * **`search home` (DHCP Option 15 - Domain Search):** Evinizdeki modemin dağıttığı yerel alan adı sonekidir (`.home`).
-> * **Neden NetworkManager Logu Yok?** Mirrored modda gerçek DHCP anlaşmasını (DORA) Windows'un DHCP istemcisi modemle tamamlar ve elde ettiği parametreleri anında Linux çekirdeğine enjekte eder. (Windows PowerShell'de `ipconfig /all` yazarak modemin dağıttığı kira süresini görebilirsiniz).
+```powershell
+# 2. Windows PowerShell üzerinde modemin dağıttığı gerçek DHCP (DORA) kira detayları:
+ipconfig /all
+
+# Terminalinizdeki Gerçek Çıktı:
+# Wireless LAN adapter Wi-Fi:
+#    Connection-specific DNS Suffix  . : home
+#    Description . . . . . . . . . . . : MediaTek Wi-Fi 6 MT7920 Wireless LAN Card
+#    Physical Address. . . . . . . . . : 50-2E-91-64-40-5E
+#    DHCP Enabled. . . . . . . . . . . : Yes
+#    IPv4 Address. . . . . . . . . . . : 192.168.1.89(Preferred)
+#    Subnet Mask . . . . . . . . . . . : 255.255.255.0
+#    Lease Obtained. . . . . . . . . . : 11 Ekim 2026 Pazar 16:06:08
+#    Lease Expires . . . . . . . . . . : 12 Ekim 2026 Pazartesi 19:21:24
+#    Default Gateway . . . . . . . . . : 192.168.1.1
+#    DHCP Server . . . . . . . . . . . : 192.168.1.1
+#    DNS Servers . . . . . . . . . . . : 192.168.1.1
+```
+
+> 🔍 **DHCP Seçeneklerinin (Options) Ağ Mühendisliği Analizi:**
+> * **`Description: MediaTek Wi-Fi 6 MT7920`:** Linux'ta `eth3` olarak aynalanan gerçek fiziksel Wi-Fi kartınızın modelidir.
+> * **`Physical Address: 50-2E-91-64-40-5E`:** Katman 2 MAC adresi (Linux'taki `eth3` ile birebir aynıdır).
+> * **`DHCP Server: 192.168.1.1` (DHCP Option 54):** DORA paketlerini yanıtlayan ve IP'yi kiralayan modeminizin adresidir.
+> * **`Default Gateway: 192.168.1.1` (DHCP Option 3):** Dış dünyaya giden kapıdır.
+> * **`DNS Servers: 192.168.1.1` (DHCP Option 6):** Alan adlarını çözecek modem DNS yönlendiricisidir.
+> * **`Lease Obtained / Expires` (DHCP Kira Süresi - Option 51):** Modemin size bu IP'yi (`192.168.1.89`) yaklaşık 27 saatliğine kiraladığını belgeler. Sürenin yarısında (%50 - T1 süresi) bilgisayarınız modeme DHCP Request atarak süreyi otomatik uzatır.
+> 
+> 💡 *Not: Çıktınızın altındaki `vEthernet (WSL) - 172.28.192.1 / 255.255.240.0` bağdaştırıcısı ise, ilk başta yaşadığımız ve `Network is unreachable` hatası veren eski sanal NAT anahtarının ta kendisidir!*
 
 ---
 
