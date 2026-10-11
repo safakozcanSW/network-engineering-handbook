@@ -1,0 +1,458 @@
+================================================================================
+AĞ MÜHENDİSLİĞİ KAVRAMLARI: BİR CİHAZIN AĞA BAĞLANIŞINDAN İSTEKLERİN AKIŞINA 
+ADIM ADIM KRONOLOJİK ÖĞRENME YOL HARİTASI
+================================================================================
+Bu rehber özeti; bilgisayar ağlarının temel kavramlarını alfabetik veya rastgele 
+kitap modülleri sırasıyla değil; BİR CİHAZIN KABLOYU TAKTIĞI / WI-FI'A BAĞLANDIĞI 
+ANDAN İTİBAREN internetteki ya da yerel ağdaki bir hedefe ulaşana kadar paketlerin 
+arkasında milisaniyeler içinde işletilen GERÇEK YAŞAM DÖNGÜSÜ SIRASINA göre sunar:
+
+  [1. Donanımsal Kimlik]        --> 01-MAC Adresi
+  [2. İlk Bağlantı & Parametre] --> 02-DHCP (DORA Süreci)
+  [3. Mantıksal Kimlik]        --> 03-IP Adresi (IPv4 / IPv6)
+  [4. Ağ Sınırları & Kapsam]   --> 04-Subnet Mask & CIDR (Hedef Aynı Ağda mı?)
+  [5. Dış Dünya Çıkış Kapısı]   --> 05-Default Gateway (Ağ Geçidi)
+  [6. Fiziksel Adres Bulma]     --> 06-ARP (Kapının veya Hedefin MAC Adresi)
+  [7. İsim Çözümleme]           --> 07-DNS (Alan Adını IP'ye Çevirme)
+  [8. Uygulama Seviyesi Soket]  --> 08-Portlar ve Sockets (IP:Port Oturumu)
+  [9. Taşıma Katmanı Bağlantı]  --> 09-TCP & UDP (El Sıkışma / Datagram)
+  [10. Çıkış / Giriş Güvenliği] --> 10-Firewall (Stateful Denetim)
+  [11. Genel İnternet Çevirisi] --> 11-NAT (Yerel IP'yi Public IP'ye Çevirme)
+  [12. Altyapı İzolasyonu]      --> 12-VLAN & Trunking (802.1Q Etiketleme)
+  [13. Güvenli Uzak Tünel]      --> 13-VPN (IPsec / WireGuard Şifreli Tünel)
+  [14. Vekillik & Yük Dağıtımı] --> 14-Proxy (Forward & Reverse Proxy)
+  [15. Uçtan Uca Bütünleşik]    --> 15-Bütünleşik Kurumsal Ağ Mimarisi Senaryosu
+================================================================================
+
+
+01-MAC (Media Access Control) Adresi [Aşama 1: Donanımsal Fiziksel Kimlik]
+    * Nedir:
+        - Her ağ arayüz kartına (NIC) üretici tarafından donanıma kazınmış 48-bitlik (6 oktet) benzersiz fiziksel kimliktir.
+        - Cihaz daha hiçbir ağa bağlanmadan, kablo takılmadan önce fabrikadan çıktığı anda sahip olduğu tek kalıcı kimliktir.
+        - Format Örneği: 52:54:00:12:34:56 (İlk 3 oktet OUI üretici kodu, son 3 oktet üretilen karta özel seri numarasıdır).
+    * Kullanım Amacı:
+        - OSI 2. Katmanda (Data Link) aynı yerel ağ (LAN) içindeki switch'lerin paketleri hedef cihazın portuna doğru anahtarlaması (switching) için kullanılır.
+        - Switch CAM Tablosu (MAC Tablosu) Mantığı:
+            - Aynı switch'e kabloyla bağlı 3 bilgisayar düşünelim:
+                - PC-1 (Port 1): AA:AA:AA:AA:AA:AA
+                - PC-2 (Port 2): BB:BB:BB:BB:BB:BB
+                - PC-3 (Port 3): CC:CC:CC:CC:CC:CC
+            - PC-1, PC-2'ye yerel ağdan bir dosya göndermek istediğinde, paketin Ethernet çerçevesindeki "Hedef MAC" kısmına BB:BB:BB:BB:BB:BB yazılır.
+            - Paket switch'e ulaştığında switch hafızasındaki MAC Tablosuna (CAM Table) bakar ve bu adresin Port 2'de olduğunu görür.
+            - Paketi gereksiz yere PC-3'e göndermez; doğrudan ve yalnızca Port 2'ye iletir. Böylece ağ trafiği boğulmaz ve güvenli iletim sağlanır.
+    * İşletim Sistemi Seviyesinde Geçici Değiştirme (MAC Spoofing):
+        - Donanımdaki kalıcı fabrika çıkış adresine (BIA - Burned-in Address) dokunulmaz; işletim sistemi çekirdeğindeki sanal ağ yığınında geçici olarak ezilir (override).
+        - Linux Örneği:
+            - ip link show eth0
+            - sudo ip link set dev eth0 down
+            - sudo ip link set dev eth0 address 00:11:22:33:44:55
+            - sudo ip link set dev eth0 up
+    * Sanal Makinelerde (KVM/libvirt/VMware) MAC Sabitleme:
+        - Sanal makinelerde gerçek fiziksel ağ kartı yoktur; hipervizör (hypervisor) sanal bir kart (vNIC) emüle eder.
+        - Elle sabitlenmezse her yeniden başlatmada rastgele MAC türetilebilir. XML şablonunda sabitlenerek klonlarda ve yeniden kurulumlarda aynı MAC'in kalması sağlanır.
+        - Hipervizör OUI Standartları:
+            - KVM / QEMU: 52:54:00:xx:xx:xx
+            - VMware ESXi/Workstation: 00:50:56:xx:xx:xx veya 00:0c:29:xx:xx:xx
+            - Oracle VirtualBox: 08:00:27:xx:xx:xx
+    * MAC Adresi ile DHCP Rezervasyonu Nasıl Güvenceye Alınır? (Sıfırdan Mantık Zinciri):
+        - 1. Cihaz Ağa Bağlanır ve İstek Gönderir: Henüz IP'si yoktur ama sabit MAC kimliğiyle ağa çağrı atar.
+        - 2. DHCP Sunucusu / Modem Eşleştirir: DHCP tablosunda tanımlı kurala bakar ("Bu MAC gelirse rastgele IP verme, her zaman 192.168.1.100 IP'sini teslim et!").
+        - 3. Büyük Avantajı: Cihaz formatlansa veya yeniden kurulsa dahi aynı IP'yi alır. Sunucu IP'leri kaybolmaz, DNS ve firewall yönlendirmeleri bozulmaz.
+    * Cihaza İstediğimiz IP Adresini Atama Yöntemleri ve 4 Altın Kural:
+        - 1. Yöntem: Modem üzerinden MAC - IP eşleştirmesi (Statik DHCP / DHCP Binding) — En sağlıklı yol.
+        - 2. Yöntem: Cihazın işletim sistemi ağ ayarlarından elle statik IP tanımlama.
+        - Zorunlu 4 Altın Kural:
+            - 1. Aynı alt ağ bloğunda (Subnet) olmalı (Modem 192.168.1.1 ise cihaz 192.168.1.X olmalı).
+            - 2. Modem/Gateway IP'si ile çakışmamalı (192.168.1.1 verilemez).
+            - 3. Ağdaki başka bir cihaz tarafından kullanılmamalı (IP çakışması önlenmeli).
+            - 4. DHCP dağıtım havuzunun dışından seçilmeli (Örn: Havuz .100 - .200 arasıysa, sabit IP olarak .20 veya .220 seçilmeli).
+    * Gündelik Hayatta Karşılığı:
+        - Analoji: Bir insanın T.C. Kimlik Numarası gibidir; kişi nereye taşınırsa taşınsın sabittir. Modem üzerinde MAC Filtreleme açılarak yabancı cihazların Wi-Fi'a girmesini engellemek en tipik örnektir.
+    * Alternatif Kullanım Amaçları ve Örnekleri:
+        - Otel / Havaalanı Wi-Fi Süre Sıfırlama (MAC Spoofing): macchanger -r wlan0 komutuyla MAC değiştirilerek 30 dakikalık ücretsiz internet kotası sıfırlanabilir.
+        - Wake-on-LAN (WoL): Bilgisayar kapalıyken ağ kartına hedef MAC adresini içeren 102 baytlık özel "Magic Packet" (FF:FF:FF:FF:FF:FF + 16 kez hedef MAC) gönderilerek uzaktan uyandırılması.
+
+
+02-DHCP (Dynamic Host Configuration Protocol) [Aşama 2: Ağa İlk Bağlantı ve Dinamik Yapılandırma]
+    * Nedir:
+        - Ağa yeni katılan cihazlara otomatik IP adresi, Subnet Mask, Default Gateway ve DNS gibi yapılandırma parametrelerini dinamik olarak dağıtan protokoldür (UDP 67 - Sunucu, UDP 68 - İstemci).
+    * Cihaz Kabloyu Taktığı / Wi-Fi'a Bağlandığı Anda Ne Olur? (DORA Süreci):
+        - Cihaz açıldığında henüz IP'si, alt ağ maskesi, ağ geçidi ve DNS'i yoktur.
+        - 1. Discover (İstemci -> Broadcast: 255.255.255.255): "Ben şu MAC adresine sahibim, ağda DHCP sunucusu var mı? Bana IP lazım!"
+        - 2. Offer (Sunucu -> İstemcinin MAC'ine): "Elimde boşta 192.168.1.50 var, maske/gateway/DNS bilgileriyle birlikte teklif ediyorum."
+        - 3. Request (İstemci -> Broadcast): "192.168.1.50 teklifini kabul ettim, adıma rezerve et lütfen."
+        - 4. Acknowledge / ACK (Sunucu -> İstemci): "Tamamdır, IP senin. Kira süren 24 saat."
+    * Temel Yapılandırma Parametreleri:
+        - Scope / IP Pool: Dağıtılacak IP adres aralığı (örn: 192.168.1.50 - 192.168.1.200).
+        - Lease Time (Kira Süresi): IP adresinin istemciye tahsis edilme süresi.
+        - DHCP Options (İstemciye Verilen Ek Bilgiler):
+            - Option 3: Default Gateway (Varsayılan Ağ Geçidi)
+            - Option 6: DNS Sunucuları
+            - Option 15: Domain Name (Yerel arama soneki - örn: sirket.local)
+            - Option 66 / 67 (PXE Boot): Ağdan işletim sistemi kurmak için gereken TFTP sunucu IP'si ve önyükleme dosyası adı.
+            - Option 150 (VoIP): IP telefonların santral profillerini çekeceği çağrı santralinin (PBX) IP adresi.
+        - DHCP Relay Agent (ip helper-address): Farklı VLAN'lardaki istemcilerin broadcast çağrılarını unicast pakete çevirip sistem odasındaki merkezi DHCP sunucusuna aktaran aktarıcıdır.
+    * Gündelik Hayatta Karşılığı:
+        - Analoji: Otele giriş yaptığınızda resepsiyon görevlisinin size oda anahtarı, otel kuralları kitapçığı ve Wi-Fi şifresi vermesidir. Otelden ayrıldığınızda oda başkasına tahsis edilir.
+    * Alternatif Kullanım Amaçları ve Örnekleri:
+        - PXE Boot: Bilgisayarlara USB takmadan açılışta ağdan işletim sistemi imajı yükleme.
+        - IP Telefon (VoIP) Provizyonu: Masalardaki IP telefonların açılır açılmaz santral adresini öğrenip profillerini yüklemesi.
+
+
+03-IP Adresi (IPv4 & IPv6) [Aşama 3: Mantıksal Ağ Kimliği ve Konum]
+    * Nedir:
+        - DHCP tarafından atanan (veya elle girilen), cihazların ağlar üzerinde mantıksal olarak konumlanmasını sağlayan, yönlendirilebilir 32-bit (IPv4) veya 128-bit (IPv6) adresleme protokolüdür.
+        - OSI 3. Katmanda (Network) paketlerin farklı yerel ağlar ve internet omurgası üzerinden hedefe yönlendirilmesini (Routing) sağlar.
+    * IPv4 vs IPv6 (Neden Yeni Protokole Geçiyoruz?):
+        - IPv4 (32-bit):
+            - Yaklaşık 4.3 milyar adres üretir. 2010'lu yıllarda dünyadaki tüm IPv4 adresleri tükenmiştir.
+            - Bu açığı kapatabilmek için NAT tekniği geliştirilmiştir (evdeki onlarca cihaz modemin arkasında tek bir Public IP paylaşır).
+            - NAT Kapatılırsa Ne Olur? (Bridge / Köprü Modu): Modem yönlendirici kimliğini bırakıp sinyal dönüştürücüye dönüşür. Arkasındaki birden çok cihaz internete çıkamaz. Sadece pfSense/FortiGate gibi harici firewall takıldığında çifte NAT'ı önlemek için kapatılır.
+        - IPv6 (128-bit):
+            - Yaklaşık 3.4 x 10^38 adres üretir. Dünyadaki her kum tanesine trilyonlarca IP verilebilir.
+            - NAT zorunluluğunu kaldırır: Her cihaz genel internette uçtan uca (End-to-End) benzersiz küresel IP alabilir.
+            - Dahili Güvenlik: IPsec standardı doğrudan protokolün içine gömülüdür.
+            - Otomatik Yapılandırma (SLAAC): DHCP olmadan cihazlar kendi IP adreslerini otomatik türetebilir (Stateless Address Autoconfiguration).
+    * Dual-Stack ve Happy Eyeballs (RFC 8305):
+        - Modern işletim sistemleri ve modemler hem IPv4 hem IPv6'yı aynı anda taşır (Dual-Stack).
+        - Happy Eyeballs: Tarayıcı bir siteye bağlanırken milisaniyeler arayla hem IPv4 hem IPv6 ile el sıkışmayı dener; hangi hat daha hızlıysa bağlantı oradan akar.
+    * Cihaz Seviyesinde Manuel Geçiş / Kapatma:
+        - Windows: ncpa.cpl üzerinden "TCP/IPv6" işaretini kaldırmak veya PowerShell: Disable-NetAdapterBinding -Name "Wi-Fi" -ComponentID ms_tcpip6
+        - Linux: sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+        - Komut Seviyesinde Tek Seferlik Tercih: curl -4 / ping -4 veya curl -6 / ping -6
+        - Modem / ISP Seviyesinde: Servis sağlayıcı IPv6 tanımlamadığı sürece dış dünyaya yalnızca IPv4 ile çıkılabilir.
+    * Temel IP Blokları ve Sınıflandırma:
+        - Public IP (Genel): İnternette yönlendirilebilen küresel IP'lerdir.
+        - Private IP (Özel - RFC 1918): İnternete doğrudan çıkamayan yerel ağ bloklarıdır:
+            - 10.0.0.0/8 (Büyük kurumsal yapılar ve veri merkezleri)
+            - 172.16.0.0/12 (Orta ölçekli ağlar / Docker container ağları)
+            - 192.168.0.0/16 (Ev ve küçük ofis ağları)
+        - Loopback IP (127.0.0.1 / ::1): Cihazın kendi TCP/IP yığınını test eden ve dışarı paket çıkarmadan yerel servislere bağlanmayı sağlayan adrestir.
+        - APIPA (169.254.0.0/16): DHCP'den yanıt alınamadığında işletim sisteminin atadığı geçici yerel iletişim IP'sidir. Görüldüğünde DHCP sunucusunun ulaşılamaz olduğu anlaşılır.
+    * Ağdaki 2 Yasaklı Adres (Network ve Broadcast):
+        - Network Adresi (İlk IP - örn: 192.168.1.0): O alt ağın kimlik kartıdır; hiçbir cihaza verilemez.
+        - Broadcast Adresi (Son IP - örn: 192.168.1.255): Mahallenin genel anons hoparlörüdür; cihaza verilemez.
+    * Gündelik Hayatta Karşılığı:
+        - Analoji: MAC kimlik kartıysa, IP adresi evinizin posta adresidir. Şehir veya sokak değiştirdiğinizde (başka ağa bağlandığınızda) posta adresiniz değişir.
+    * Alternatif Kullanım Amaçları ve Örnekleri:
+        - Coğrafi Engellemeler (GeoIP): Netflix, Steam vb. servislerin kullanıcının Public IP'sine göre içerik kütüphanesini ve fiyatları sınırlandırması.
+        - Anycast IP Dağıtımı: Tek bir IP'nin (1.1.1.1 veya 8.8.8.8) BGP ile dünyanın yüzlerce veri merkezinde aynı anda anons edilip kullanıcının fiziksel en yakın noktaya yönlendirilmesi.
+        - Yazılım Geliştirme İzolasyonu (Loopback): İnternet olmasa bile localhost:3000 üzerinden 127.0.0.1 ile API testlerinin güvenle yapılması.
+
+
+04-Subnet Mask (Alt Ağ Maskesi) & CIDR [Aşama 4: Konum Kararı - Hedef Aynı Ağda mı, Dışarıda mı?]
+    * Temel Mantık: Bir IP Adresi İki Parçadan Oluşur:
+        - 1. Ağ Kimliği (Mahalle / Site Adı): O ağdaki tüm cihazlar için ortaktır.
+        - 2. Cihaz Kimliği (Daire Numarası): Sadece o cihaza özeldir.
+        - Subnet Mask, bilgisayara bu 4 sayının neresinin Mahalle Adı, neresinin Daire Numarası olduğunu söyleyen şablondur.
+    * Subnet Mask Nasıl Çalışır? (255.255.255.0 Örneği):
+        - 255 yazan kısımlar: "Burası Mahalle adıdır; sabittir, dokunulamaz!" der.
+        - 0 yazan kısım: "Burası Daire numarasıdır; cihazlara göre değişebilir!" der.
+        - Bileşen Tablosu:
+            - Cihazınızın IP'si:    192 . 168 . 1 . 50     (Bilgisayarınızın tam adresi)
+            - Subnet Mask:          255 . 255 . 255 . 0     (İlk 3 kısım Mahalle, son kısım Daire No)
+            - Ağ Adı (Network ID):  192.168.1.x             (Bağlı olunan mahalle/ağ)
+            - Cihaz No (Host ID):   .50                     (Bilgisayarın kapı numarası)
+    * Aynı Ağda mıyız, Farklı Ağda mı? (Kritik İletişim Kararı):
+        - Bilgisayar bir yere paket göndereceği anda hedef IP ile kendi Subnet Mask'ını çarpar:
+            - Yan odadaki bilgisayar 192.168.1.60 ise mahalle kısmı (192.168.1) aynı olduğundan AYNI YEREL AĞDADIR. Paket router'a gitmeden switch üzerinden doğrudan gider.
+            - Karşıdaki bilgisayar 192.168.2.50 ise mahalle kısmı (192.168.2) farklı olduğundan FARKLI AĞDADIR. Ona doğrudan seslenemez; paketi kapıdaki yönlendiriciye (Default Gateway) teslim etmek zorundadır.
+    * CIDR Nedir? O Slash (/24) Nereden Geliyor?
+        - Bilgisayarlar sayıları ikilik sistemde tutar. Her 255 sayısı sekiz adet '1' demektir:
+          11111111 . 11111111 . 11111111 . 00000000 -> Toplam 24 adet '1' vardır.
+        - Kısaca /24 yazılır. Baştan 24 bit ağ adı olarak kilitlidir.
+        - Cihazlara Kalan Bit: 32 - 24 = 8 bit.
+        - Toplam Üretilebilecek IP: 2^8 = 256 adet.
+        - Kullanılabilir Cihaz Sayısı Formülü: 2^(32 - CIDR) - 2 -> 256 - 2 = 254 cihaz bağlanabilir.
+    * Neden Ağları Böleriz? (Subnetting İhtiyacı):
+        - Broadcast trafiğini sınırlamak (500 bilgisayar tek ağda olursa anonslar ağı boğar).
+        - Güvenlik ve yetkilendirme (Muhasebe ağı ile Misafir Wi-Fi ağını birbirinden yalıtmak).
+    * Gerçek Hayattan İki Boyutlandırma Örneği:
+        - 1. Veritabanı İçin Neden /28 Seçilir? (Bulut Mimarisi):
+            - 3-4 veritabanı sunucusu için 254 kişilik /24 açmak israftır.
+            - /28 tanımlanır: 32 - 28 = 4 bit -> 2^4 = 16 toplam IP; ilk ve son adres düşünce 14 kullanılabilir IP kalır.
+            - Bu küçük özel alt ağın internete kapısı açılmaz, sadece web sunucularının erişimine izin verilir.
+        - 2. İki Cihaz Arasındaki Kablo İçin Neden /30 Seçilir? (Noktadan Noktaya):
+            - İki router arasındaki tek kablo için /30 tanımlanır.
+            - 32 - 30 = 2 bit -> 2^2 = 4 toplam IP; ilk ve son adres düşünce tam 2 kullanılabilir IP kalır. Biri Router A'ya, diğeri Router B'ye verilir. Sıfır israf!
+    * Adım Adım Alt Ağlara Bölme Pratiği (/30 Nasıl Hesaplanır?):
+        - 1. Adım: 30 Bit Kilitli, 2 Bit Serbest: 2 bit ile ikilik sistemde yalnızca 4 sayı üretilebilir (00=0, 01=1, 10=2, 11=3).
+        - 2. Adım: Kutu Mantığı: 0=Network (tabela), 1=Router A, 2=Router B, 3=Broadcast (megafon). Kullanılabilir = 2 IP.
+        - 3. Adım: 256'lık Büyük Havuzun Dilimlenmesi:
+            - 256 / 4 = 64 adet bağımsız alt ağ kutusu çıkar.
+            - 1. Kutu: 192.168.1.0 - 192.168.1.3
+            - 2. Kutu: 192.168.1.4 - 192.168.1.7
+            - 3. Kutu: 192.168.1.8 - 192.168.1.11 ... 64. Kutu: 192.168.1.252 - 192.168.1.255
+        - 4. Adım: 255.255.255.252 Nereden Geldi? (Bit Tartısı):
+            - Son sekizli: 1 1 1 1 1 1 0 0 -> 128 + 64 + 32 + 16 + 8 + 4 = 252 (veya 256 - 4 = 252).
+        - 5. Adım: Yanlış Yapılandırma Hatası: Router A 192.168.1.1/30, Router B yanlışlıkla 192.168.1.5/30 yapılırsa; ikisi farklı kutularda olduğundan aralarında fiziksel kablo olsa dahi birbirini görmezler ve hat çalışmaz!
+
+
+05-Default Gateway (Varsayılan Ağ Geçidi) [Aşama 5: Yerel Ağ Dışına Çıkış Kapısı]
+    * Nedir:
+        - Subnet Mask kontrolü sonucunda hedefin yerel alt ağ dışında olduğu anlaşıldığında (örneğin internete veya farklı bir VLAN'a gidecek tüm paketlerin) teslim edildiği yönlendiricinin (Router) yerel IP adresidir.
+    * Kullanım Amacı:
+        - Yönlendirme tablosunda (Routing Table) özel rota kuralı bulunmayan trafiğin (0.0.0.0/0) dış dünyaya ulaştırılmasıdır.
+    * Gateway Yanlış veya Eksik Olursa Ne Olur? (Kritik Sorun Teşhisi):
+        - Yerel ağdaki diğer cihazlarla iletişim kesintisiz devam eder. Komşu bilgisayara ping atılabilir, yerel yazıcıdan çıktı alınabilir (çünkü Katman 2 switch üzerinde MAC tablosuyla akar).
+        - Ancak internete veya başka bir alt ağa çıkılmak istendiğinde işletim sistemi paketi teslim edecek kapı bulamaz ve "Network is unreachable" hatası verir.
+    * Ayar ve Parametre:
+        - Linux'ta: ip route show / ip route add default via 192.168.1.1 dev eth0
+        - DHCP sunucuları bu bilgiyi istemcilere otomatik olarak DHCP Option 3 parametresi ile iletir.
+    * Gündelik Hayatta Karşılığı:
+        - Analoji: Evinizin dış kapısı veya sitenin güvenlik nizamiye kapısıdır. Odalar arasında gezerken kapıdan çıkmazsınız; ancak markete gitmek veya şehir dışına çıkmak için tek çıkış yolu o kapıdır.
+    * Alternatif Kullanım Amaçları ve Örnekleri:
+        - Yedekli Ağ Geçidi Protokolleri (HSRP / VRRP): Finans kurumlarında iki ayrı router ortak bir "Sanal Gateway IP'si" tanımlar. Biri arızalandığında diğeri milisaniyeler içinde devralır, internet kesilmez.
+        - Policy-Based Routing (PBR / Çoklu İnternet Çıkışı): Biri fiber diğeri LTE iki hat varken yönlendirici kuralıyla muhasebe trafiği fiber gateway'e, misafir Wi-Fi trafiği LTE gateway'e sevk edilir.
+
+
+06-ARP (Address Resolution Protocol) [Aşama 6: Kapının / Hedefin Donanım (MAC) Adresini Çözümleme]
+    * Nedir:
+        - 32-bit mantıksal IPv4 adresini, yerel ağda karşılığı olan 48-bit fiziksel MAC adresine dönüştüren Katman 2 ile Katman 3 arasındaki köprü protokoldür.
+    * Kullanım Amacı:
+        - Paket kabloya basılırken Ethernet çerçeve başlığına hedef MAC adresinin yazılması şarttır. ARP, IP'si bilinen cihazın MAC adresini dinamik olarak öğrenir.
+    * Hedef Aynı Ağda mı, Dışarıda mı? (ARP Karar Mekanizması):
+        - Bilgisayar paket hazırlarken Subnet Mask kontrolünün sonucuna bakar:
+            - Hedef Yerel Ağdaysa: Doğrudan hedef makinenin IP'si için ARP sorgusu atar ("Who has 192.168.1.50? Tell 192.168.1.10").
+            - Hedef İnternette / Farklı Ağdaysa (Örn: google.com): Bilgisayar asla Google'ın MAC adresini sormaz! Paket IP başlığında Google IP'sini korurken, Ethernet çerçevesine Default Gateway'in (Router) MAC adresi yazılır. Dolayısıyla ARP sorgusu Google için değil, Gateway IP'si (192.168.1.1) için atılır! Paketi alan Router onu internete fırlatır.
+    * Gratuitous ARP (Ağa İlk Katılımda Çakışma Kontrolü):
+        - Cihaz IP'yi DHCP'den alır almaz hemen kullanmaya başlamaz. Önce ağa "Bu IP'yi kullanan var mı?" diye karşılıksız bir ARP yayını (Gratuitous ARP) atar. Yanıt gelmezse IP'yi güvenle kullanır; yanıt gelirse "IP Address Conflict" hatası verir.
+    * Ayar & İnceleme Komutları:
+        - arp -a
+        - ip neigh show
+        - ip neigh add 192.168.1.1 lladdr 00:11:22:33:44:55 dev eth0 nud permanent (Statik ARP kaydı)
+    * Gündelik Hayatta Karşılığı:
+        - Analoji: Bir sınıfta öğretmenin "Ali Veli burada mı?" diye bağırması (ARP Request - Broadcast) ve sadece Ali Veli'nin "Ben buradayım, kimliğim budur" demesidir (ARP Reply - Unicast).
+    * Alternatif Kullanım Amaçları ve Örnekleri:
+        - Siber Güvenlik / Man-in-the-Middle (ARP Poisoning / Spoofing): Saldırgan cihaz ağa sahte ARP yanıtları basarak "Gateway benim MAC adresimdir" der; tüm internet trafiğini kendi üzerinden geçirerek şifresiz verileri çalar.
+        - Proxy ARP: Bir yönlendiricinin, farklı alt ağdaki hedef adına ARP isteklerine kendi MAC adresini dönerek yönlendirme altyapısını istemciden gizlemesi.
+
+
+07-DNS (Domain Name System) [Aşama 7: İstenen Alan Adını (Site İsmini) IP Adresine Çevirme]
+    * Nedir:
+        - İnsanların okuyabildiği alan adlarını (FQDN: ornek.com) bilgisayarların anladığı sayısal IP adreslerine (93.184.216.34) dönüştüren küresel, dağıtık veritabanıdır (Port 53 UDP/TCP).
+        - Kullanıcı tarayıcıya site adı yazdığında, DHCP'den öğrendiği DNS sunucusu devreye girerek IP çözümlemesi yapar.
+    * Kritik DNS Kayıt Türleri:
+        - A: Alan adını IPv4 adresine eşler (google.com -> 142.250.184.206).
+        - AAAA: Alan adını IPv6 adresine eşler (google.com -> 2a00:1450:4001:828::200e).
+        - CNAME: Bir alan adını başka bir alan adına takma ad (alias) yapar (www.site.com -> site.com).
+        - MX: Alan adına gelen e-posta sunucularını ve önceliklerini belirtir (10 mail.site.com).
+        - PTR: IP adresinden alan adını bulur (Reverse DNS - 1.1.1.1 -> one.one.one.one).
+        - TXT: Güvenlik ve doğrulama metinleri içerir (SPF, DKIM, site sahiplik doğrulaması).
+        - NS: O alan adından sorumlu yetkili DNS sunucularını belirtir (ns1.cloudflare.com).
+        - SOA: Bölgenin seri numarası, yenileme ve TTL temel kurallarını tutan master yetki kaydıdır.
+    * DNS Sorgusu Sırasıyla Nereye Gider? (Hiyerarşik Çözümleme Adımları):
+        - 1. Tarayıcı Önbelleği (Browser Cache): Tarayıcı yakın zamanda bu adrese gitti mi?
+        - 2. İşletim Sistemi Önbelleği & hosts Dosyası: Bilgisayarın yerel hafızası ve statik hosts dosyası kontrol edilir.
+        - 3. Recursive DNS Çözücüsü (Özyinelemeli Sunucu): Ev modemi, ISP DNS'i veya 1.1.1.1 / 8.8.8.8. Cevap yoksa kök sunuculara sorar:
+            - Kök DNS (Root Server - "."): Sorguyu ilgili TLD sunucusuna (.com) paslar.
+            - TLD Sunucusu (.com): Sorguyu alan adının yetkili sunucusuna (ns1.google.com) paslar.
+            - Yetkili DNS (Authoritative Server): Domain'in gerçek sahibi olan sunucudur; IP adresini çözücüye iletir.
+        - 4. Önbellekleme & TTL (Time-to-Live): Çözücü bu IP'yi TTL süresince saklar ve istemciye teslim eder; sonraki sorgular anında cevaplanır.
+    * Gündelik Hayatta Karşılığı:
+        - Analoji: Telefon rehberi uygulamasıdır. Arkadaşınızı ararken 11 haneli numarasını ezberlemezsiniz; rehberden ismini seçersiniz, telefon arka planda numarayı çevirir.
+    * Alternatif Kullanım Amaçları ve Örnekleri:
+        - Ağ Seviyesinde Reklam Engelleme (Pi-hole / DNS Sinkholing): Yerel ağdaki DNS sunucusu bilinen reklam alan adlarına 0.0.0.0 dönerek tüm ev ağında reklamsız internet sağlar.
+        - E-Posta Sahteciliği Engelleme (SPF, DKIM, DMARC): Kurum adına sahte e-posta atılmasını engellemek için DNS TXT kayıtları üzerinden gönderici sunucu IP'leri doğrulanır.
+        - GeoDNS: Kullanıcı Avrupa'dan bağlandığında Frankfurt sunucu IP'si, Asya'dan bağlandığında Singapur IP'si dönülerek gecikme düşürülür.
+
+
+08-Portlar ve Sockets [Aşama 8: İstemci ve Hedef Servis Uygulama Soketini Açma]
+    * Nedir:
+        - Hedef IP adresi DNS ile öğrenildikten sonra, bu IP üzerindeki hangi uygulamanın aranacağını belirlemek için Port ve Socket devreye girer.
+        - Port: Bir cihaz üzerinde aynı anda çalışan binlerce ağ uygulamasını birbirinden ayıran 16-bitlik mantıksal numaradır (0 - 65535 arası).
+            - Well-Known Ports (0 - 1023): SSH: 22, HTTP: 80, HTTPS: 443, DNS: 53 vb.
+            - Registered Ports (1024 - 49151): MySQL: 3306, PostgreSQL: 5432, Redis: 6379 vb.
+            - Dynamic / Ephemeral Ports (49152 - 65535): Giden istemci bağlantıları için işletim sisteminin açtığı rastgele geçici portlar.
+        - Socket: Bir IP adresi ile bir Port numarasının birleşimidir (Örnek: 192.168.1.10:53400 -> 142.250.184.206:443). İki uygulama arasındaki tekil oturumu temsil eder.
+    * Gündelik Hayatta Karşılığı:
+        - Analoji: Holding plazanın ana giriş kapı adresi IP ise, içerideki departmanların dahili oda numaraları Port'lardır. Muhasebe için Dahili 80, Bilgi İşlem için Dahili 22'ye gidersiniz.
+    * Alternatif Kullanım Amaçları ve Örnekleri:
+        - Port Knocking (Gizli Kapı Tıklatma): SSH portu (22) dış dünyaya tamamen kapalı tutulur. Yönetici gizli bir port sırasıyla (UDP 7000 -> TCP 8500 -> TCP 9200) paket gönderdiğinde güvenlik duvarı yöneticinin IP'sine 30 saniyeliğine 22 portunu açar.
+        - Mikroservis ve Container Mimarileri: Tek bir sunucu üzerinde çalışan onlarca Docker container; localhost:8001, localhost:8002, localhost:5432 port soketlerini dinleyerek aynı çekirdeği çakışmadan paylaşır.
+
+
+09-TCP & UDP Karşılaştırması [Aşama 9: Taşıma Katmanında Bağlantı Kurma (El Sıkışma / Datagram)]
+    * Taşıma Katmanı (Transport Layer - Katman 4):
+        - Belirlenen soketler arasında verinin nasıl iletileceğini yönetir.
+    * Karşılaştırma Tablosu:
+        Özellik                   TCP (Transmission Control Protocol)     UDP (User Datagram Protocol)
+        ------------------------  --------------------------------------  ----------------------------
+        Bağlantı Durumu           Bağlantı odaklı (3-Way Handshake)       Bağlantısız (Connectionless)
+        Güvenilirlik              Yüksek (Kayıp paketler tekrar yollanır) Düşük (Kayıp tespiti/tekrarı yok)
+        Sıralama                  Sıralı teslimat garantilidir            Paketler farklı sırayla varabilir
+        Gecikme & Başlık Yükü     Yüksek (Minimum 20 byte başlık)         Çok Düşük (Yalnızca 8 byte başlık)
+        Akış & Tıkanıklık Kontrolü Var (Windowing, Congestion Avoidance)  Yok
+        Tipik Protokoller         HTTP/HTTPS, SSH, FTP, SMTP, MySQL       DNS, DHCP, VoIP, Canlı Yayın, Syslog
+    * TCP 3-Way Handshake (Üç Aşamalı El Sıkışma Süreci):
+        - 1. SYN (İstemci -> Sunucu): "Seninle 443 portundan güvenli bağlantı kurmak istiyorum."
+        - 2. SYN-ACK (Sunucu -> İstemci): "İsteğini aldım, ben de hazırım."
+        - 3. ACK (İstemci -> Sunucu): "Anlaştık, veri aktarımına başlıyoruz."
+    * Gündelik Hayatta Karşılığı:
+        - TCP: İadeli taahhütlü mektuptur; alıcı teslim aldığına dair imza atar, kaybolursa tekrar gönderilir.
+        - UDP: Canlı stadyum anonsu veya radyo yayınıdır; o an bir kelime kaçarsa yayın durup tekrar etmez, akış sürer.
+    * Alternatif Kullanım Amaçları ve Örnekleri:
+        - QUIC Protokolü (HTTP/3): TCP'nin bağlantı gecikmelerini ve hat başı tıkanmasını (Head-of-Line Blocking) aşmak için UDP üzerinde şifreli ve güvenilir yeni taşıma katmanı kurulmuştur (UDP 443).
+        - Yoğun Log İletimi (Syslog UDP 514): Saniyede yüz binlerce log basılan sistemlerde diskin kilitlenmemesi için loglar "fire-and-forget" mantığıyla UDP üzerinden fırlatılır.
+
+
+10-Firewall (Güvenlik Duvarı) [Aşama 10: Çıkış ve Giriş Trafik Güvenliği / Stateful Denetim]
+    * Nedir:
+        - Paket yerel ağdan çıkıp ağ geçidine ve internete yönlendirilirken (veya dışarıdan içeri girerken) belirlenmiş güvenlik kuralları doğrultusunda paketleri inceleyen, izin veren veya engelleyen (Drop/Reject) donanım/yazılım sistemidir.
+    * Stateful Inspection (Durum Denetimli Güvenlik):
+        - Güvenlik duvarı yalnızca tekil paket başlıklarına bakmaz; oturum tablosu (Connection State Table) tutar.
+        - İç ağdan dışarıya başlatılan bir web bağlantısının geri dönüş paketlerine otomatik olarak izin verir (ESTABLISHED, RELATED).
+    * Temel Kurallar ve Linux Örneği (iptables):
+        - Giden bağlantıların dönüşüne otomatik izin ver: iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+        - SSH portuna (22) yeni bağlantı kabul et: iptables -A INPUT -p tcp --dport 22 -m conntrack --ctstate NEW -j ACCEPT
+        - Kalan tüm gelen paketleri düşür: iptables -P INPUT DROP
+    * Gündelik Hayatta Karşılığı:
+        - Analoji: Gece kulübü kapısındaki güvenlik görevlisidir. Sadece listede adı olanlar içeri girebilir; içeriden bir müşteri hava almak için kapıya çıkıp döndüğünde koruma onu tanıdığı için (Stateful Inspection) tekrar kimlik sormadan içeri alır.
+    * Alternatif Kullanım Amaçları ve Örnekleri:
+        - DDoS Koruması ve Rate Limiting: 1 saniyede 100'den fazla istek atan IP adreslerinin güvenlik duvarı seviyesinde geçici olarak kara listeye alınması.
+        - Coğrafi Engelleme (Geo-IP Blocking): Yalnızca yerel pazara hizmet veren bir şirketin ülke dışı IP bloklarından gelen yönetim portlarını tamamen engellemesi.
+
+
+11-NAT (Network Address Translation) [Aşama 11: Yerel IP'yi İnternete Çıkarma ve Port Çevirisi]
+    * Nedir:
+        - İstemcinin yerel IP'si (Private: 192.168.1.50) internet omurgasında yönlendirilemez. Paket modemden veya şirket kenar router'ından çıkarken kaynak IP ve port bilgilerinin genel (Public) IP ile değiştirilerek aktarılması işlemidir.
+    * Temel Türleri:
+        - SNAT (Source NAT): İç ağdan dışarıya giden paketlerin yerel kaynak IP'si, yönlendiricinin genel (Public) IP'si ile değiştirilir.
+        - PAT (Port Address Translation / NAT Overload): Yüzlerce cihazın tek bir Public IP üzerinden farklı rastgele istemci portları açılarak internete çıkarılmasıdır (Ev modemlerindeki standart çalışma biçimi).
+        - DNAT (Destination NAT / Port Forwarding): Dış dünyadan yönlendiricinin Public IP'sine ve belirli bir portuna gelen isteğin, iç ağdaki belirli bir yerel sunucuya (192.168.1.100:80) yönlendirilmesidir.
+    * PAT Çeviri Tablosu Nasıl Çalışır? (Dönüş Paketini Modem Kime Vereceğini Nereden Bilir?):
+        - Evdeki iki telefon aynı anda Google'a bağlandığında modem ikisini de tek Public IP (88.240.12.5) arkasından çıkarır:
+            [İç Cihaz Soketi]        ──► [Modem NAT Tablosu (Dışarı Çıkış)] ──► [Hedef Web Sunucu]
+            192.168.1.15:52110       ──► 88.240.12.5:41001                 ──► 142.250.184.206:443
+            192.168.1.20:53400       ──► 88.240.12.5:41002                 ──► 142.250.184.206:443
+        - Google sunucusu cevabı modemin 41002 nolu portuna döndüğünde, modem hafızasındaki tabloya bakar:
+          "41002 portu içerideki 192.168.1.20:53400 cihazına aitti" der ve paketi doğrudan o telefona teslim eder. Paketler asla birbirine karışmaz.
+    * Ev ve Ofis Modemlerinde NAT Yönetimi:
+        - NAT'ı Aktif Etme (Varsayılan): Modem arayüzünden "Enable NAT" seçilir, tüm ev tek Public IP'yi paylaşır.
+        - NAT'ı Pasif Etme (Bridge / Köprü Modu): Modem saf sinyal dönüştürücüye döner. Arkasına pfSense/FortiGate takıldığında çifte NAT (Double NAT) sorununu önlemek için kullanılır.
+        - Port Yönlendirme (DNAT / Port Forwarding): Dış dünyadan 8080 portuna gelen istekleri içerideki 192.168.1.100:80 web servisine aktarmak için kural yazılır.
+        - DMZ & UPnP:
+            - DMZ: Kuralı olmayan tüm portları doğrudan tek bir iç cihaza yönlendirir (Güvenlik riski yüksektir).
+            - UPnP: Oyun konsolları veya torrent istemcilerinin ihtiyaç duydukları portları dinamik açıp kapatmasını sağlar.
+    * Linux Sunucularda NAT Komutları (iptables & sysctl):
+        - Çekirdekte Yönlendirmeyi Açma: sudo sysctl -w net.ipv4.ip_forward=1
+        - SNAT / Masquerade (İnternet Paylaşımı): sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+        - DNAT (Port Yönlendirme): sudo iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 8080 -j DNAT --to-destination 192.168.1.100:80
+        - Tabloyu İnceleme: sudo iptables -t nat -L -n -v --line-numbers
+    * Gündelik Hayatta Karşılığı:
+        - Analoji: Şirketin santral numarası gibidir. 500 çalışanın dış aramalarında karşı taraf sadece santral numarasını görür (SNAT/PAT). Müşteri "Dahili 105'i bağlayın" dediğinde santral çağrıyı ilgili masaya aktarır (DNAT / Port Forwarding).
+    * Alternatif Kullanım Amaçları ve Örnekleri:
+        - CGNAT (Carrier-Grade NAT): Servis sağlayıcıların IPv4 kıtlığı nedeniyle binlerce aboneyi tek IP havuzunda toplaması (evde port açmayı engeller; çözüm Cloudflare Tunnel veya Tailscale'dir).
+        - Twice NAT: Birleşen iki şirketin yerel IP blokları çakıştığında (ikisi de 192.168.1.0/24) router üzerinde paketlerin geçici sanal bloklara çevrilerek konuşturulması.
+
+
+12-VLAN (Virtual Local Area Network) & Trunking [Aşama 12: Ağ İzolasyonu, Anahtarlama ve Omurga Etiketleme]
+    * Nedir:
+        - Fiziksel bir switch altyapısını yazılımsal ve mantıksal olarak birbirinden tamamen bağımsız yayın alanlarına (Broadcast Domain) bölme teknolojisidir.
+    * Temel Kavramlar:
+        - VLAN ID: 12-bitlik değer (1 - 4094 arası).
+        - Access Port: Yalnızca tek bir VLAN'a ait olan ve uç cihazlara (PC, yazıcı) giden etiketlenmemiş (untagged) port.
+        - Trunk Port: Birden fazla VLAN'a ait paketleri üzerinde IEEE 802.1Q standardı etiketleriyle (VLAN Tag) taşıyan omurga port (Switch-Switch veya Switch-Router arası).
+    * Paket Yaşam Döngüsü (Etiket Nerede Takılır, Nerede Sökülür?):
+        - 1. PC switch'e normal (etiketsiz) paket gönderir.
+        - 2. Switch paketi Access Port'tan aldığı anda pakete o portun VLAN numarasını (örn: VLAN 10) yapıştırır (Tagging - IEEE 802.1Q).
+        - 3. Paket omurga üzerinden Trunk Port ile etiketli olarak taşınır.
+        - 4. Hedef switch paketi hedefteki Access Port'tan çıkarmadan önce etiketi söker (Untag) ve bilgisayara standart Ethernet paketi olarak teslim eder.
+    * Inter-VLAN Routing Mantığı:
+        - Farklı VLAN'lardaki cihazlar Katman 2 seviyesinde birbirini asla göremez.
+        - Birbirleriyle konuşabilmeleri için araya mutlaka Katman 3 yönlendirici (Router on a Stick) veya L3 Switch (SVI - Switch Virtual Interface) konulmalıdır.
+    * Gündelik Hayatta Karşılığı:
+        - Analoji: Plazadaki tek bir asansör kabininin hem normal personel hem de kartını okutan VIP yöneticiler tarafından kullanılmasıdır. Aynı fiziksel ray kullanılır ancak çalışanlar VIP kata basamaz.
+    * Alternatif Kullanım Amaçları ve Örnekleri:
+        - IoT İzolasyonu: Akıllı süpürgeler, IP kameralar için VLAN 20 (IoT) açılır. İnternete çıkabilirler ancak evdeki PC ve NAS depolamanın olduğu VLAN 10'a erişemezler.
+        - Sanallaştırma Altyapısı (VMware / Proxmox): Sunucuya bağlı tek bir 10G fiziksel trunk hat üzerinde 50 farklı VLAN taşınarak yalıtılmış DMZ, Uygulama ve Veritabanı katmanları kurulur.
+
+
+13-VPN (Virtual Private Network) [Aşama 13: Genel İnternet Üzerinden Güvenli Şifreli Tünel]
+    * Nedir:
+        - Eğer hedef genel bir internet sitesi değil de şirketin başka bir şubesi, fabrikası veya buluttaki özel sunucularıysa; paket genel internete açık çıkmaz. İki uç nokta arasında kriptografik olarak şifrelenmiş, yalıtılmış sanal bir tünel kurulur (IPsec, WireGuard, OpenVPN).
+    * Temel Türleri:
+        - Remote Access VPN: Bireysel kullanıcıların şirket ağına uzaktan bağlanması (WireGuard, OpenVPN, Cisco AnyConnect).
+        - Site-to-Site VPN: İki farklı ofisin router'ları arasında 7/24 kalıcı şifreli tünel kurulması (IPsec IKEv2).
+    * Full Tunnel vs Split Tunnel (Kritik Mimari Ayrımı):
+        - Full Tunnel (Tam Tünel): Cihazın ürettiği tüm internet trafiği VPN tüneli üzerinden şirket merkezine akar. Güvenlik en üst seviyedir ancak şirketin internet bant genişliğini tüketir ve hızı yavaşlatabilir.
+        - Split Tunnel (Ayrık Tünel): Yalnızca şirket içi IP bloklarına (10.0.0.0/8, 192.168.50.0/24) giden istekler şifreli tünelden geçer. Kullanıcının genel internet aramaları ve videoları kendi yerel internetinden akar. Hızlıdır ve bant genişliği tasarrufu sağlar.
+    * Gündelik Hayatta Karşılığı:
+        - Analoji: Kalabalık ve güvensiz bir caddenin altından iki bina arasına kazılmış özel, kilitli ve zırhlı bir yer altı geçididir. Dışarıdakiler içeriden ne taşındığını göremez.
+    * Alternatif Kullanım Amaçları ve Örnekleri:
+        - Uzaktan Çalışma (Work From Anywhere): Evdeki çalışanın ofisteki kabloya bağlıymış gibi şirket içi staging ve veritabanlarına güvenle erişmesi.
+        - Halka Açık Wi-Fi Koruması: Kafe/otel ağlarında paket dinlemeyi (sniffing) önlemek için cihazın tüm trafiğini evdeki WireGuard sunucusuna yönlendirmesi.
+        - Fabrika ve Şube Birleştirme: Ankara merkez ile Bursa fabrikası router'ları arasında kurulan Site-to-Site tünel ile barkod okuyucuların internete çıkmadan doğrudan yerel IP'lerle merkeze veri aktarması.
+
+
+14-Proxy (Vekil Sunucu: Forward vs Reverse) [Aşama 14: İstemci Filtreleme ve Sunucu Yük Dengeleme]
+    * Nedir:
+        - İstemci ile hedef sunucu arasına girerek trafiği denetleyen, önbelleğe alan veya yönlendiren vekil sunucudur.
+    * Forward Proxy vs Reverse Proxy Karşılaştırması:
+        Kriter                  Forward Proxy                           Reverse Proxy
+        ----------------------  --------------------------------------  -----------------------------------
+        Kimi Korur / Temsil Eder? İstemciyi (Client) internetten korur  Sunucuları (Backend) internetten korur
+        Konum                   İstemcinin yerel ağında / çıkışında     Sunucu kümesinin hemen önünde
+        Görünürlük              Hedef site istemcinin gerçek IP'sini görmez İstemci arkadaki sunucuların IP'sini bilmez
+        Temel Görevleri         İçerik filtreleme, şirket kuralları, önbellek Yük dengeleme (Load Balancing), SSL Karşılama, WAF
+        Popüler Yazılımlar      Squid, Shadowsocks, Charles Proxy       Nginx, HAProxy, Traefik, Envoy
+    * Kritik Proxy Başlıkları (X-Real-IP ve X-Forwarded-For):
+        - Proxy arkasındaki backend sunucusu gelen paketlerin kaynak IP'sini proxy IP'si olarak görür.
+        - Gerçek kullanıcı IP'sinin denetim (audit) loglarında kaybolmaması için Nginx yapılandırmasında X-Real-IP ve X-Forwarded-For başlıkları arka sunucuya aktarılır.
+    * SSL Termination (SSL Sonlandırma):
+        - Yoğun HTTPS şifre çözme yükü Nginx üzerine alınır. Nginx şifreyi çözer ve arkadaki backend sunucularına saf HTTP ile hızlıca dağıtır.
+    * Gündelik Hayatta Karşılığı:
+        - Forward Proxy: Sizin yerinize alışverişe giden özel yardımcıdır; satıcı ürünün kime gittiğini bilmez, yalnızca yardımcıyı görür.
+        - Reverse Proxy: Büyük holdingin çağrı merkezi santralidir; müşteri tek numarayı arar, santral arkadaki 50 temsilciden müsait olanına bağlar.
+    * Alternatif Kullanım Amaçları ve Örnekleri:
+        - Web Scraping (Rotating Residential Proxy): E-ticaret sitelerinden fiyat çeken botların engellenmemek için her istekte farklı vekil IP kullanması.
+        - Blue-Green Deployment: Versiyon güncellemelerinde Nginx trafiği yeni sunucu kümesine anında aktararak sıfır kesintili (zero-downtime) yayın sağlar.
+
+
+15-Bütünleşik Kurumsal Ağ Mimarisi ve Senaryo Özeti [Uçtan Uca Kronolojik İstek Akışı]
+    * Senaryo:
+        - Çalışan sabah ofise gelir, masasında Ethernet kablosunu bilgisayarına takar.
+        - Hem şirket içi muhasebe portalına (https://portal.sirket.local) hem de dış internetteki https://google.com sitesine erişmek ister.
+    * 0. Aşama: Sahne Arkası (IT Altyapı Mimarisi):
+        - Sokak / ISP Fiber Hattı -> Modem / ONT (Bridge Modu) -> Donanımsal Firewall WAN Portu (Dış Kapı) -> Core Switch LAN Portu (İç Kapı).
+        - Kat Kenar Anahtarları (Access Switch) Core Switch'e yüksek hızlı fiber Trunk Port (IEEE 802.1Q) ile bağlıdır.
+        - Masa Prizleri: Access Port olarak ayarlanmış ve VLAN 10 (Personel Ağı) içine kilitlenmiştir.
+        - DHCP Relay Agent (ip helper-address): Çalışanın VLAN 10'dan attığı broadcast DHCP çağrısını unicast IP paketine çevirip sistem odasındaki (VLAN 50) DHCP sunucusuna teslim eder.
+    * 1. Aşama: Kabloyu Takma ve Kimlik Alma (Switch Port, VLAN, DHCP):
+        - Bilgisayar ağ kartı MAC kimliğiyle DHCP Discover broadcast çağrısı yapar.
+        - DHCP sunucusu IP (10.10.1.45), Subnet Mask (/24), Default Gateway (10.10.1.1) ve DNS (10.10.1.10) bilgilerini teslim eder.
+        - (Wi-Fi Durumunda): Telefon ağa bağlanırken önce Gratuitous ARP atarak IP çakışması olup olmadığını kontrol eder; ardından Default Gateway'in MAC adresini öğrenmek için ARP Request fırlatıp ARP tablosuna kaydeder.
+    * 2. Aşama: Şirket İçi DNS Çözümleme:
+        - Tarayıcıya portal.sirket.local yazılır. Şirket içi DNS (10.10.1.10) sorgulanır ve sunucu odasındaki Reverse Proxy IP'si (10.20.1.50) öğrenilir.
+    * 3. Aşama: Departmanlar Arası Geçiş ve Güvenlik Duvarı (Inter-VLAN Routing & Internal Firewall):
+        - Hedef farklı mahallede (VLAN 20) olduğundan paket Default Gateway'e teslim edilir.
+        - İç Güvenlik Duvarı kuralı inceler (VLAN 10 -> VLAN 20 Port 443 İzinli mi?); Stateful Inspection ile oturum tablosuna kaydedip geçişi onaylar.
+    * 4. Aşama: Sunucu Odasında Karşılama ve Yük Dağıtımı (Reverse Proxy - Nginx):
+        - Nginx SSL sertifikasını çözer (SSL Termination).
+        - X-Real-IP ve X-Forwarded-For başlıklarını ekleyerek gerçek çalışan IP'sini arka sunucuya aktarır.
+        - least_conn algoritmasıyla isteği en müsait backend sunucusuna (10.20.1.62:3000) yönlendirir ve portal açılır.
+    * Şirket İçi Mekanizma Varyasyonları:
+        - Forward Proxy: Çalışan google.com gibi dış sitelere gitmek istediğinde içerik filtreleme ve virüs taramasından geçer.
+        - PAT (Port Address Translation): Şirketteki 1000 cihaz internete çıkarken tek kurumsal Public IP arkasında port bazında maskelenir.
+        - Site-to-Site VPN: İstanbul ofisinden Ankara genel merkezindeki veya buluttaki (AWS VPC) sunuculara şeffaf şifreli tünelle erişilir.
+        - Ağ İzolasyonu: Misafir Wi-Fi'ı (VLAN 99) internete çıkabilir ancak şirket içi sunuculara (VLAN 20) erişimi Firewall kurallarıyla kesinlikle engellenir (DROP).
+        - Bastion Host (Jump Server): Sistem yöneticileri sunuculara SSH bağlantısı yaparken önce 2FA korumalı atlama sunucusuna bağlanır, tüm oturum loglanır.
+
+
+ÖZET:
+
+01-MAC Adresi: Cihaz fabrikadan çıktığı andan itibaren fiziksel ağ kartında (NIC) sabit 48-bit donanımsal kimliğe sahiptir.
+02-DHCP: Cihaz kabloyu masadaki prize taktığında henüz IP'si yoktur; MAC kimliğini kullanarak broadcast DHCP Discover çağrısı yapar. DHCP sunucusu cihaza IP, Subnet Mask, Default Gateway ve DNS bilgilerini teslim eder (DORA süreci).
+03-IP Adresi: DHCP'den alınan mantıksal yönlendirilebilir adrestir (IPv4/IPv6).
+04-Subnet Mask & CIDR: Cihaz bir yere paket göndereceği zaman hedef IP ile bu maskeyi karşılaştırır: "Hedef benimle aynı yerel ağda mı, yoksa dış dünyada mı?" kararını verir.
+05-Default Gateway: Hedef yerel ağ dışındaysa (0.0.0.0/0 rotası), paketin yerel ağdan çıkıp dış dünyaya ulaşması için teslim edileceği yönlendiricidir (Router IP'si).
+06-ARP: Cihaz paketi kabloya basmadan önce hedef yerel ağdaysa hedefin, hedef dışarıdaysa Default Gateway'in fiziksel MAC adresini bulmak için ARP sorgusu atar (ve ağa ilk bağlandığında IP çakışması var mı diye Gratuitous ARP yayınlar).
+07-DNS: Kullanıcı tarayıcıya google.com veya portal.sirket.local yazdığında, DHCP'den öğrendiği DNS sunucusuyla alan adını sayısal IP adresine çevirir.
+08-Portlar ve Sockets: Cihazdaki tarayıcı için giden bir geçici istemci portu (Ephemeral Port) ve hedef sunucu portu (80/443) belirlenir; IP:Port soketi kurulur.
+09-TCP & UDP Karşılaştırması: Kurulan soket üzerinden güvenilir veri aktarımı için TCP 3-Way Handshake (SYN, SYN-ACK, ACK) ile el sıkışılır veya hızlı veri için UDP datagramı atılır.
+10-Firewall: Paket yerel ağdan çıkarken ve hedef sunucunun kapısına vardığında güvenlik duvarı kuralları ve durum denetimi (Stateful Inspection) işletilir.
+11-NAT: Cihazın kullandığı yerel Private IP internette yönlendirilemez. Kenar yönlendirici / modem üzerinde PAT/SNAT ile genel Public IP'ye çevrilerek internete fırlatılır.
+12-VLAN & Trunking: Paketler anahtarlama omurgasından geçerken IEEE 802.1Q etiketleriyle departmanlar arasında mantıksal olarak yalıtılır.
+13-VPN: Eğer hedef internetteki halka açık bir site değil de uzaktaki bir merkez ofis veya bulut (AWS VPC) ise; paket genel internete açık çıkmaz, şifreli tünelden (IPsec/WireGuard) geçer.
+14-Proxy: Çıkışta istemciyi koruyup filtreleyen Forward Proxy veya hedef sunucu kümesinin kapısında SSL sonlandırıp trafiği en az yüklü sunucuya dağıtan Reverse Proxy (Nginx) karşılar.
+15-Bütünleşik Kurumsal Senaryo: Bir çalışanın masasında kabloyu taktığı andan şirket portalının ve Google'ın açılmasına kadar arka planda milisaniyeler içinde gerçekleşen tüm bu akışın uçtan uca özetidir.
