@@ -34,90 +34,69 @@ Ağ kartınızın fiziksel donanım kimliğini görmek ve geçici olarak değiş
 # 1. Mevcut ağ kartlarını ve MAC adreslerini listele
 ip link show
 
-# Terminalinizdeki Gerçek Çıktı (Mirrored Ağ Modu):
+# Terminalinizdeki Gerçek Çıktı (VMware Ubuntu):
 # 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
 #    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
-# 2: eth0: <BROADCAST,MULTICAST> mtu 1500 qdisc mq state DOWN mode DEFAULT group default qlen 1000
-#    link/ether 00:15:5d:eb:99:b8 brd ff:ff:ff:ff:ff:ff
-# 3: eth1: <BROADCAST,MULTICAST> mtu 1500 qdisc mq state DOWN mode DEFAULT group default qlen 1000
-#    link/ether 90:82:c3:3e:74:45 brd ff:ff:ff:ff:ff:ff
-# 4: eth2: <BROADCAST,MULTICAST> mtu 1500 qdisc mq state DOWN mode DEFAULT group default qlen 1000
-#    link/ether 00:ff:36:f4:d5:44 brd ff:ff:ff:ff:ff:ff
-# 5: loopback0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000
-#    link/ether 00:15:5d:7b:60:3f brd ff:ff:ff:ff:ff:ff
-# 6: eth3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000
-#    link/ether 50:2e:91:64:40:5e brd ff:ff:ff:ff:ff:ff
-#    altname enx502e9164405e
+# 2: ens33: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UNKNOWN mode DEFAULT group default qlen 1000
+#    link/ether 00:0c:29:dd:2c:3b brd ff:ff:ff:ff:ff:ff
 ```
 
-> 🔍 **Çıktının Detaylı Analizi (Tüm Arayüzlerin Görevleri):**
-> * **`1: lo` (Standart Linux Loopback):**
->   * Linux çekirdeğinin kendi içindeki servislerle konuşmasını sağlayan klasik sanal döngüdür (`localhost` / `127.0.0.1`).
+> 🔍 **Çıktının Detaylı Ağ Mühendisliği Analizi:**
+> * **`1: lo` (Loopback - Yerel İç Döngü):**
+>   * Fiziksel bir donanım veya kablo değildir.
+>   * İşletim sisteminin kendi kendine konuşmasını sağlayan sanal iç döngüdür (`localhost` / `127.0.0.1`).
 >   * Donanımsal bir kart olmadığı için MAC adresi boştur: `link/loopback 00:00:00:00:00:00`.
-> * **`5: loopback0` (Windows $\leftrightarrow$ Linux Aynalama Köprüsü):**
->   * `networkingMode=mirrored` ile gelen özel sanal bağdaştırıcıdır.
->   * Microsoft sanal donanım kodu taşır (`link/ether 00:15:5d:7b:60:3f`).
->   * **Görevi:** Windows tarafındaki `localhost` ile Linux tarafındaki `localhost` portlarını birbirine bağlamaktır. Windows'ta veya Linux'ta açılan bir web sunucusuna her iki taraftan da erişilmesini sağlar.
-> * **`2: eth0`, `3: eth1`, `4: eth2` (`state DOWN`):**
->   * Windows bilgisayarınızdaki kablo takılı olmayan Ethernet portları, Bluetooth ağ bağdaştırıcısı veya sanal VPN arayüzleridir. Aktif bağlantı olmadığı için durumları `DOWN` gözükür.
-> * **`6: eth3` (`state UP` - Asıl Fiziksel Ağ Kartınız / NIC):**
->   * Bilgisayarınızı modeme ve internete bağlayan **ana aktif karttır**.
->   * `link/ether 50:2e:91:64:40:5e` $\rightarrow$ Bilgisayarınızın Wi-Fi veya Ethernet donanımının **gerçek fabrika çıkışlı 48-bit fiziksel MAC adresidir**!
->   * `brd ff:ff:ff:ff:ff:ff` $\rightarrow$ Katman 2 Ethernet genel yayın (*Broadcast*) adresidir.
+> * **`2: ens33` (Ana Ethernet Ağ Kartınız / NIC):**
+>   * Modern Linux'un öngörülebilir ağ arayüzü isimlendirmesidir (*Predictable Interface Names: Ethernet on bus/slot 33*).
+>   * **`link/ether 00:0c:29:dd:2c:3b`:** Ağ kartınızın 48-bitlik fiziksel **MAC adresidir**. İlk 3 oktet olan `00:0c:29`, VMware'in IEEE tescilli resmi donanım üretici kimliğidir (*OUI*).
+>   * **`brd ff:ff:ff:ff:ff:ff`:** Katman 2 Ethernet genel yayın (*Broadcast*) adresidir.
+>   * **`mtu 1500`:** Maximum Transmission Unit; Ethernet standardında tek bir pakette taşınabilecek maksimum veri yükü 1500 bayttır.
 
 ```bash
 # 2. Geçici MAC Adresi Değiştirme (MAC Spoofing Testi):
-sudo ip link set dev eth3 down
-sudo ip link set dev eth3 address 00:11:22:33:44:55
-sudo ip link set dev eth3 up
+sudo ip link set dev ens33 down
+sudo ip link set dev ens33 address 00:11:22:33:44:55
+sudo ip link set dev ens33 up
 
 # Tekrar doğrula:
-ip link show eth3
+ip link show ens33
+# (Test bittikten sonra eski haline getirmek veya otomatik almak için sistemi yeniden başlatabilirsiniz).
 ```
 
 ---
 
 ## 02. DHCP DORA Sürecini ve Parametrelerini İnceleme
 
-Cihazınızın ağa ilk katıldığında DHCP sunucusundan (modeminizden) nasıl parametre aldığını görmek için:
+Cihazınızın ağa ilk katıldığında DHCP sunucusundan (evdeki modeminizden) nasıl parametre aldığını görmek için:
 
 ```bash
-# 1. Linux tarafında DHCP ile atanan DNS ve arama alanını incele:
+# 1. DHCP tarafından sistemde tutulan aktif kira dosyasını incele:
+cat /run/systemd/netif/leases/* 2>/dev/null || cat /var/lib/NetworkManager/*.lease 2>/dev/null
+
+# Terminalinizdeki Gerçek Çıktı:
+# # This is private data. Do not parse.
+# ADDRESS=192.168.1.177
+
+# 2. DHCP ile atanan DNS ve yerel arama alanını incele:
 cat /etc/resolv.conf
 
-# Çıktı:
-# nameserver 10.255.255.254
+# Terminalinizdeki Gerçek Çıktı:
+# nameserver 127.0.0.53
+# options edns0 trust-ad
 # search home
 ```
 
-```powershell
-# 2. Windows PowerShell üzerinde modemin dağıttığı gerçek DHCP (DORA) kira detayları:
-ipconfig /all
-
-# Terminalinizdeki Gerçek Çıktı:
-# Wireless LAN adapter Wi-Fi:
-#    Connection-specific DNS Suffix  . : home
-#    Description . . . . . . . . . . . : MediaTek Wi-Fi 6 MT7920 Wireless LAN Card
-#    Physical Address. . . . . . . . . : 50-2E-91-64-40-5E
-#    DHCP Enabled. . . . . . . . . . . : Yes
-#    IPv4 Address. . . . . . . . . . . : 192.168.1.89(Preferred)
-#    Subnet Mask . . . . . . . . . . . : 255.255.255.0
-#    Lease Obtained. . . . . . . . . . : 11 Ekim 2026 Pazar 16:06:08
-#    Lease Expires . . . . . . . . . . : 12 Ekim 2026 Pazartesi 19:21:24
-#    Default Gateway . . . . . . . . . : 192.168.1.1
-#    DHCP Server . . . . . . . . . . . : 192.168.1.1
-#    DNS Servers . . . . . . . . . . . : 192.168.1.1
-```
-
-> 🔍 **DHCP Seçeneklerinin (Options) Ağ Mühendisliği Analizi:**
-> * **`Description: MediaTek Wi-Fi 6 MT7920`:** Linux'ta `eth3` olarak aynalanan gerçek fiziksel Wi-Fi kartınızın modelidir.
-> * **`Physical Address: 50-2E-91-64-40-5E`:** Katman 2 MAC adresi (Linux'taki `eth3` ile birebir aynıdır).
-> * **`DHCP Server: 192.168.1.1` (DHCP Option 54):** DORA paketlerini yanıtlayan ve IP'yi kiralayan modeminizin adresidir.
-> * **`Default Gateway: 192.168.1.1` (DHCP Option 3):** Dış dünyaya giden kapıdır.
-> * **`DNS Servers: 192.168.1.1` (DHCP Option 6):** Alan adlarını çözecek modem DNS yönlendiricisidir.
-> * **`Lease Obtained / Expires` (DHCP Kira Süresi - Option 51):** Modemin size bu IP'yi (`192.168.1.89`) yaklaşık 27 saatliğine kiraladığını belgeler. Sürenin yarısında (%50 - T1 süresi) bilgisayarınız modeme DHCP Request atarak süreyi otomatik uzatır.
+> 🔍 **Canlı Bridged Mod Analizi (Modemin Verdiği Bağımsız IP ve DNS):**
 > 
-> 💡 *Not: Çıktınızın altındaki `vEthernet (WSL) - 172.28.192.1 / 255.255.240.0` bağdaştırıcısı ise, ilk başta yaşadığımız ve `Network is unreachable` hatası veren eski sanal NAT anahtarının ta kendisidir!*
+> * 📜 **`ADDRESS=192.168.1.177` (Resmi Kira Sözleşmesi / DHCP Lease):**  
+>   Ubuntu açıldığında modeme anons yaptı (*DHCP Discover*). Modeminiz de salonda oturan Windows bilgisayarınızın (`192.168.1.89`) yanına, bu yeni Ubuntu sanal makinenize evdeki boş dairelerden biri olan **`192.168.1.177`** IP'sini tapuladı/kiraladı. Sistem bu resmi sözleşmeyi unutmamak için `leases` dosyasına `ADDRESS=192.168.1.177` olarak kaydetti.
+> 
+> * 🏢 **`nameserver 127.0.0.53` (Bina İçi Danışma Memuru / `systemd-resolved`):**  
+>   Hatırlarsanız `127.x.x.x` bloğunun tamamı **Loopback (Cihazın Kendi İçi)** demektir (53 ise DNS portudur).  
+>   * **Neden Modemin IP'si Yazmıyor?** Modern Ubuntu, her `google.com` aramasında dışarı modeme gidip gecikme yaşanmasın diye işletim sisteminin kendi içine süper hızlı bir **DNS Önbellekçisi** kurmuştur.
+>   * **Nasıl Çalışır?** Bir web sitesine girmek istediğinizde sorgu önce bu iç danışma memuruna (`127.0.0.53`) gider. Eğer bu site daha önce ziyaret edilmişse modeme hiç sormadan **0 milisaniyede** hafızadan cevap verir! Hafızada yoksa, memur arka kapıdan çıkıp modeminiz olan `192.168.1.1`'e sorar, cevabı hem hafızasına kaydeder hem de size teslim eder.
+> 
+> * 🏷️ **`search home`:** Modemin ev ağınıza dağıttığı yerel alan adı sonekidir.
 
 ---
 
@@ -126,41 +105,46 @@ ipconfig /all
 Modeminizin DHCP sunucusundan aldığınız mantıksal yönlendirilebilir Katman 3 adresini incelemek için:
 
 ```bash
-# Aktif ağ kartınızın (eth3) adreslerini listele:
-ip addr show eth3
+# Aktif ağ kartınızın (ens33) adreslerini listele:
+ip addr show ens33
 
 # Terminalinizdeki Gerçek Çıktı:
-# 6: eth3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 ...
-#     link/ether 50:2e:91:64:40:5e brd ff:ff:ff:ff:ff:ff
-#     inet 192.168.1.89/24 brd 192.168.1.255 scope global noprefixroute eth3
-#     inet6 fe80::8d02:c40b:b42e:fbc9/64 scope link nodad noprefixroute
+# 2: ens33: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UNKNOWN group default qlen 1000
+#     link/ether 00:0c:29:dd:2c:3b brd ff:ff:ff:ff:ff:ff
+#     inet 192.168.1.177/24 brd 192.168.1.255 scope global dynamic noprefixroute ens33
+#        valid_lft 85170sec preferred_lft 85170sec
+#     inet6 fe80::20c:29ff:fedd:2c3b/64 scope link noprefixroute
+#        valid_lft forever preferred_lft forever
 ```
 
 > 🔍 **Çıktı Analizi:**
-> * **`192.168.1.89` (IPv4 Private IP):** Evinizdeki modemin bilgisayarınıza özel olarak tahsis ettiği C Sınıfı yerel IP adresidir (RFC 1918).
+> * **`192.168.1.177` (IPv4 Private IP):** Evinizdeki modemin Ubuntu sanal makinenize özel olarak tahsis ettiği C Sınıfı yerel IP adresidir.
 > * **`/24` CIDR Notasyonu:** Alt ağ maskesini (`255.255.255.0`) temsil eder.
-> * **`fe80::...` (IPv6 Link-Local):** Aynı yerel ağdaki cihazların modeme ihtiyaç duymadan doğrudan konuşabilmesi için üretilen yerel IPv6 adresidir.
-
----
-
-## 04. Subnet Mask, CIDR ve Ağ Sınırlarını Hesaplama
-
-Ağ kartınızın hangi mahallede (Subnet) yer aldığını görmek ve sınırlarını hesaplamak için:
-
-```bash
-# Alt ağ maskesini incele:
-ip -4 addr show eth3 | grep inet
-
-# Çıktı: inet 192.168.1.89/24 brd 192.168.1.255 scope global noprefixroute eth3
-```
-
-> 🧮 **Ağ Mühendisliği Hesaplaması (/24 Alt Ağı):**
-> - **CIDR:** `/24` $\implies$ Alt ağ maskesi: `255.255.255.0` ($24$ bit ağ, $8$ bit host).
-> - **Toplam IP Sayısı:** $2^8 = 256$ adet adres.
-> - **Ağ Adı (Network ID):** `192.168.1.0` (İlk adres - hiçbir cihaza verilemez, mahallenin adıdır).
-> - **Modem / Gateway:** `192.168.1.1` (Genelde ilk kullanılabilir IP modeme verilir).
-> - **Kullanılabilir Cihaz IP Aralığı:** `192.168.1.1` - `192.168.1.254` (Maksimum 254 cihaz aynı anda bağlanabilir).
-> - **Sizin Bilgisayarınız:** `192.168.1.89` (Bu aralığın içindedir).
+> * **`valid_lft 85170sec` (DHCP Kira Süresi):** $85170 \div 3600 \approx 23.6$ saat! Modemin bu IP'yi tam 24 saatliğine kiraladığının canlı kanıtıdır.
+> * **`fe80::20c:29ff:fedd:2c3b/64` (IPv6 Link-Local & EUI-64):**  
+>   MAC adresinizin (`00:0c:29:dd:2c:3b`) tam ortasına `ff:fe` eklenerek üretilen yerel IPv6 adresidir.
+> 
+> ---
+> 
+> ## 04. Subnet Mask, CIDR ve Ağ Sınırlarını Hesaplama
+> 
+> Ağ kartınızın hangi mahallede (Subnet) yer aldığını görmek ve sınırlarını hesaplamak için:
+> 
+> ```bash
+> # Alt ağ maskesini incele:
+> ip -4 addr show ens33 | grep inet
+> 
+> # Çıktı: inet 192.168.1.177/24 brd 192.168.1.255 scope global dynamic noprefixroute ens33
+> ```
+> 
+> > 🧮 **Ağ Mühendisliği Hesaplaması (/24 Alt Ağı):**
+> > - **CIDR:** `/24` $\implies$ Alt ağ maskesi: `255.255.255.0` ($24$ bit ağ, $8$ bit host).
+> > - **Toplam IP Sayısı:** $2^8 = 256$ adet adres.
+> > - **Ağ Adı (Network ID):** `192.168.1.0` (İlk adres - hiçbir cihaza verilemez, mahallenin adıdır).
+> > - **Modem / Gateway:** `192.168.1.1` (Evdeki modemin yerel IP adresi).
+> > - **Windows Bilgisayarınız:** `192.168.1.89`
+> > - **Ubuntu Sanal Makineniz:** `192.168.1.177` *(Aynı ev ağında iki bağımsız kardeş makine!)*
+> - **Kullanılabilir Cihaz IP Aralığı:** `192.168.1.1` - `192.168.1.254` (Maksimum 254 cihaz).
 > - **Broadcast (Yayın) Adresi:** `192.168.1.255` (Son adres - tüm mahalleye anons hoparlörüdür).
 
 ---
@@ -174,25 +158,15 @@ Yerel ağ dışındaki hedeflere (internete, Google'a) çıkarken trafiğin yön
 ip route
 
 # Terminalinizdeki Gerçek Çıktı:
-# default via 192.168.1.1 dev eth3 proto kernel metric 30
-# 192.168.1.0/24 dev eth3 proto kernel scope link metric 286
-# 192.168.1.1 dev eth3 proto kernel scope link metric 30
+# default via 192.168.1.1 dev ens33 proto dhcp src 192.168.1.177 metric 100
+# 192.168.1.0/24 dev ens33 proto kernel scope link src 192.168.1.177 metric 100
 ```
 
 > 🔍 **Yönlendirme Tablosunun Satır Satır Analizi:**
-> 1. **`default via 192.168.1.1 dev eth3 metric 30`:**  
->    Linux çekirdeğine der ki: *"Eğer gideceğin IP adresi yerel ağında (`192.168.1.0/24`) değilse, paketi `eth3` kartından çıkarıp evindeki modem olan `192.168.1.1` adresine teslim et!"*
-> 2. **`192.168.1.0/24 dev eth3 proto kernel scope link`:**  
->    *"Eğer hedef IP `192.168.1.x` ile başlıyorsa modeme sormana gerek yok, doğrudan kablo/Wi-Fi üzerinden komşu cihaza gönder."*
-> 
-> ```bash
-> # İnternet rotasını sorgula:
-> ip route get 8.8.8.8
-> # Çıktı: 8.8.8.8 via 192.168.1.1 dev eth3 src 192.168.1.89 ...
-> 
-> # Google'a doğrudan ping at:
-> ping -c 2 8.8.8.8
-> ```
+> 1. **`default via 192.168.1.1 dev ens33 proto dhcp src 192.168.1.177 metric 100`:**  
+>    Linux çekirdeğine der ki: *"Eğer gideceğin IP adresi yerel ağında (`192.168.1.0/24`) değilse, paketi `ens33` kartından çıkarıp evindeki modem olan `192.168.1.1` adresine teslim et! Kaynak IP olarak da kendi adresin olan `192.168.1.177`'yi kullan."*
+> 2. **`192.168.1.0/24 dev ens33 proto kernel scope link src 192.168.1.177`:**  
+>    *"Eğer hedef IP `192.168.1.x` ile başlıyorsa (örneğin Windows bilgisayarınız `192.168.1.89`), modeme sormana gerek yok, doğrudan kablo/Wi-Fi üzerinden komşu cihaza gönder."*
 
 ---
 
@@ -203,17 +177,22 @@ Modemin veya komşu makinelerin fiziksel MAC adreslerinin nasıl çözüldüğü
 ```bash
 # Mevcut ARP önbelleğini görüntüle:
 ip neigh show
-# veya:
-arp -n
 
-# Çıktı: 192.168.1.1 dev eth0 lladdr 00:1a:2b:3c:4d:5e REACHABLE
+# Terminalinizdeki Gerçek Çıktı:
+# 192.168.1.1 dev ens33 lladdr 80:ea:0b:d1:9b:20 REACHABLE
 ```
 
+> 🔍 **Canlı ARP Analizi (Modemin Gerçek Fiziksel MAC Adresi!):**
+> * **`192.168.1.1` $\leftrightarrow$ `80:ea:0b:d1:9b:20`:**  
+>   Ubuntu, modeme veri gönderebilmek için Katman 2'de modemin fiziksel adresini sordu (*ARP Request*). Modem cevap verdi (*ARP Reply*) ve tablonuza girdi!
+> * **`80:ea:0b` OUI Kodu:** Evinizdeki fiziksel modemin (Arcadyan / ZTE / Zyxel üretici kodudur) fabrika çıkışlı donanım MAC adresidir!
+> * **`REACHABLE`:** Bu cihazla iletişim aktif ve hat sağlam demektir.
+
 ```bash
-# Gratuitous ARP (IP Çakışma Kontrolü Testi - arping ile):
-# (Ağda 192.168.1.50 IP'sini kullanan başka biri var mı diye anons et)
-sudo arping -D -I eth0 -c 2 192.168.1.50
-# Çıkış kodu 0 ise IP boştadır; 1 dönerse çakışma vardır!
+# Windows bilgisayarınıza ping atıp onun da MAC adresini ARP tablosuna düşürün:
+ping -c 2 192.168.1.89
+ip neigh show
+# (Çıktıda 192.168.1.89'un karşısında Windows Wi-Fi kartınızın 50:2e:91:... MAC adresini göreceksiniz!)
 ```
 
 ---
@@ -225,12 +204,12 @@ sudo arping -D -I eth0 -c 2 192.168.1.50
 ```bash
 # 1. Sistemde tanımlı DNS sunucusunu doğrula:
 resolvectl status | grep "DNS Servers"
-# Terminalinizdeki Çıktı: DNS Servers: 10.255.255.254
+# Terminalinizdeki Çıktı: DNS Servers: 192.168.1.1 (Doğrudan evinizdeki modem!)
 
 # 2. Hızlıca DNS 'A' kaydını (IPv4 karşılığı) sorgula:
 dig google.com +noall +answer
-# Terminalinizdeki Çıktı:
-# google.com.    135    IN    A    172.217.171.78
+# Terminalinizdeki Gerçek Çıktı:
+# google.com.    121    IN    A    172.217.171.78
 
 # 3. Kök sunuculardan başlayarak dünyanın DNS hiyerarşisini adım adım izle (+trace):
 dig google.com +trace
@@ -239,7 +218,7 @@ dig google.com +trace
 > 🔍 **Canlı DNS Trace Çıktınızın Analizi (Dünya Genelinde Adım Adım Akış):**
 > 
 > 1. **1. Aşama - Kök Sunucular (Root DNS - `.`):**
->    - Sorgunuz önce dünyadaki 13 kök DNS kümesine soruldu (`a.root-servers.net` – `m.root-servers.net`).
+>    - Sorgunuz önce dünyadaki 13 kök DNS kümesine soruldu (`c.root-servers.net` – `m.root-servers.net`).
 >    - Kök sunucu dedi ki: *"Ben `google.com`'un IP'sini bilmem, ama `.com` uzantısından sorumlu TLD sunucularının listesi bende var, onlara git."*
 > 
 > 2. **2. Aşama - Üst Düzey Alan Adı Sunucuları (TLD - `.com`):**
@@ -247,11 +226,8 @@ dig google.com +trace
 >    - `.com` sunucusu dedi ki: *"Ben Google'ın kendi sunucusu değilim, ancak `google.com` alan adının yetkili sunucuları `ns1.google.com` - `ns4.google.com`'dur, git onlara sor."*
 > 
 > 3. **3. Aşama - Yetkili İsim Sunucuları (Authoritative DNS):**
->    - Paket doğrudan Google'ın kendi sunucusuna ulaştı (`ns4.google.com - 216.239.38.10`).
->    - Google'ın sunucusu kesin cevabı verdi:  
->      **`google.com. 300 IN A 172.217.21.238`**
-> 
-> 💡 *Not: Çıktınızdaki `UDP setup with 2001:... network unreachable` uyarısı, ev internetinizde genel IPv6 internet çıkışı tanımlı olmadığı için sorgunun otomatik olarak IPv4'e düşüp başarıyla tamamlandığını gösterir.*
+>    - Paket doğrudan Google'ın kendi sunucusuna ulaştı (`ns2.google.com`).
+>    - Google'ın sunucusu kesin cevabı verdi: **`google.com. IN A 172.217.171.78`**
 
 ---
 
@@ -261,43 +237,39 @@ Sisteminizde hangi servislerin hangi portlarda beklediğini ve anlık soketleri 
 
 ```bash
 # Dinlenen tüm TCP ve UDP portlarını numaraları ve süreç isimleriyle gör:
+# Dinlenen tüm TCP ve UDP portlarını numaraları ve süreç isimleriyle gör:
 ss -tulpn
 
 # Terminalinizdeki Gerçek Çıktı:
 # Netid  State   Recv-Q  Send-Q  Local Address:Port      Peer Address:Port  Process
-# udp    UNCONN  0       0       127.0.0.54:53           0.0.0.0:*          users:(("systemd-resolve",pid=85,fd=18))
-# udp    UNCONN  0       0       127.0.0.53%lo:53        0.0.0.0:*          users:(("systemd-resolve",pid=85,fd=16))
-# udp    UNCONN  0       0       10.255.255.254:53       0.0.0.0:*
-# udp    UNCONN  0       0       127.0.0.1:323           0.0.0.0:*          users:(("chronyd",pid=171,fd=4))
-# tcp    LISTEN  0       1000    10.255.255.254:53       0.0.0.0:*
-# tcp    LISTEN  0       4096    127.0.0.53%lo:53        0.0.0.0:*          users:(("systemd-resolve",pid=85,fd=17))
-# tcp    LISTEN  0       4096    127.0.0.54:53           0.0.0.0:*          users:(("systemd-resolve",pid=85,fd=19))
+# udp    UNCONN  0       0       0.0.0.0:5353            0.0.0.0:*          users:(("avahi-daemon",pid=1457,fd=12))
+# udp    UNCONN  0       0       127.0.0.54:53           0.0.0.0:*          users:(("systemd-resolve",pid=560,fd=18))
+# udp    UNCONN  0       0       127.0.0.53%lo:53        0.0.0.0:*          users:(("systemd-resolve",pid=560,fd=16))
+# udp    UNCONN  0       0       127.0.0.1:323           0.0.0.0:*          users:(("chronyd",pid=1539,fd=4))
+# udp    UNCONN  0       0          [::]:5353               [::]:*          users:(("avahi-daemon",pid=1457,fd=13))
+# udp    UNCONN  0       0         [::1]:323                [::]:*          users:(("chronyd",pid=1539,fd=5))
+# tcp    LISTEN  0       4096    127.0.0.1:631           0.0.0.0:*          users:(("cupsd",pid=1714,fd=7))
+# tcp    LISTEN  0       4096    127.0.0.53%lo:53        0.0.0.0:*          users:(("systemd-resolve",pid=560,fd=17))
+# tcp    LISTEN  0       4096    127.0.0.54:53           0.0.0.0:*          users:(("systemd-resolve",pid=560,fd=19))
+# tcp    LISTEN  0       4096      [::1]:631                [::]:*          users:(("cupsd",pid=1714,fd=6))
 
 # Anlık kurulmuş aktif bağlantı oturumlarını (IP:Port -> IP:Port) listele:
 ss -tan state established
 # Çıktı: Boş döndü (Başlıklar listelendi)
 ```
 
-> 🔍 **Açık Portların ve Servislerin Analizi:**
-> 1. **Port 53 (DNS Çözümleyici - `systemd-resolve`):**  
->    * Hem **UDP** (`UNCONN`) hem de **TCP** (`LISTEN`) modunda dinliyor.  
->    * Sisteminizin internete gitmeden önce yerel DNS isteklerini karşılayan yerel önbellek servisidir.
-> 2. **Port 323 (NTP Zaman Senkronizasyonu - `chronyd`):**  
->    * Bilgisayarınızın saatini dünya atom saatleriyle senkronize tutan Network Time Protocol (NTP) istemcisidir.
-> 3. **`state established` Neden Boş Döndü?**  
->    * Web sayfaları (HTTP/HTTPS) veriyi milisaniyeler içinde alıp soketi kapatır (`TIME_WAIT` veya kapalı duruma geçer).  
->    * Komutu çalıştırdığınız an arka planda canlı dosya indiren veya aktif açık kalan bir SSH/VPN tüneli olmadığı için tablo boştur.
-> 
-> 💡 **Canlı Bir "ESTABLISHED" Soketi Görme Testi:**
-> ```bash
-> # Arka planda geçici bir web sunucusu başlatın ve soket oluşturun:
-> python3 -m http.server 8080 &
-> curl http://localhost:8080/ >/dev/null &
-> 
-> # Anında soketleri sorgulayın:
-> ss -tan state established
-> # Çıktı: ESTAB 0 0 127.0.0.1:54322 -> 127.0.0.1:8080
-> ```
+> 🔍 **Açık Portların ve Servislerin Ağ Mühendisliği Analizi:**
+> 1. **Port 5353 (mDNS - `avahi-daemon`):**  
+>    * Multicast DNS (Zeroconf / Apple Bonjour protokolü).  
+>    * Yerel ağdaki cihazların merkezi bir DNS sunucusuna gerek kalmadan `safak.local` gibi isimlerle birbirini ve paylaşılan yazıcıları otomatik bulmasını sağlar.
+> 2. **Port 631 (CUPS Ağ Yazıcı Servisi - `cupsd`):**  
+>    * Internet Printing Protocol (IPP) üzerinden yerel ağdaki yazıcıları yöneten baskı sunucusu servisidir.
+> 3. **Port 53 (DNS Çözümleyici - `systemd-resolve`):**  
+>    * Sisteminizin yerel DNS önbellek stub servisidir (`127.0.0.53:53`).
+> 4. **Port 323 (NTP Zaman Senkronizasyonu - `chronyd`):**  
+>    * Dünya atomik saat sunucularıyla senkronize kalan zaman servisidir.
+> 5. **`state established` Neden Boş Döndü?**  
+>    * Komutu çalıştırdığınız an arka planda canlı dosya indiren veya açık kalan bir SSH bağlantısı olmadığı için liste boştur. Web istekleri milisaniyeler içinde tamamlanıp kapanır.
 
 ---
 
@@ -313,23 +285,24 @@ curl -I -s https://1.1.1.1 >/dev/null
 
 > 🔍 **Terminalinizde Yakalanan Canlı TCP Paketlerinin Analizi:**
 > ```text
-> 1. In  IP 1.1.1.1.443 > 192.168.1.89.43089: Flags [S.], seq 1510900119, ack 4246799660 ...
-> 2. Out IP 192.168.1.89.43089 > 1.1.1.1.443: Flags [.],  ack 1, win 502 ...
-> 3. Out IP 192.168.1.89.43089 > 1.1.1.1.443: Flags [P.], seq 1:1552, ack 1, length 1551 ...
-> 4. In  IP 1.1.1.1.443 > 192.168.1.89.43089: Flags [.],  ack 1552, win 16 ...
+> 1. Out IP 192.168.1.177.46814 > 1.1.1.1.443: Flags [S],  seq 3804754110, length 0
+> 2. In  IP 1.1.1.1.443 > 192.168.1.177.46814: Flags [S.], seq 1053142274, ack 3804754111, length 0
+> 3. Out IP 192.168.1.177.46814 > 1.1.1.1.443: Flags [.],  ack 1, length 0
+> 4. Out IP 192.168.1.177.46814 > 1.1.1.1.443: Flags [.],  seq 1:1441, ack 1, length 1440
 > ```
 > 
 > 🧠 **Satır Satır Ağ Mühendisliği İncelemesi:**
-> * **Soket Eşleşmesi (`192.168.1.89:43089` $\leftrightarrow$ `1.1.1.1:443`):**  
->   Bilgisayarınız işletim sistemi havuzundan geçici rastgele bir istemci portu (*Ephemeral Port*) seçti: **`43089`**. Hedef ise Cloudflare'in standart HTTPS web portu: **`443`**.
-> * **1. Paket (`Flags [S.]` - SYN-ACK):**  
->   Cloudflare sunucusu isteğinizi kabul etti (`S` = SYN) ve aldığını onayladı (`.` = ACK). Sunucu kendi rastgele sıra numarasını belirledi (`seq 1510900119`) ve sizin sıra numaranızı onayladı (`ack 4246799660`).
-> * **2. Paket (`Flags [.]` - ACK):**  
->   Bilgisayarınız sunucunun yanıtını onayladı (`ACK`). **Böylece 3-Way Handshake başarıyla tamamlandı ve TCP oturumu kuruldu!**
-> * **3. Paket (`Flags [P.]` - PUSH + ACK, Length 1551):**  
->   El sıkışma biter bitmez bilgisayarınız `length 1551` baytlık ilk gerçek şifreli veriyi (**TLS Client Hello** - HTTPS şifreleme başlatma paketi) yolladı ve hemen iletilmesi için `PUSH` bayrağını dikti!
-> * **4. Paket (`Flags [.]` - ACK, ack 1552):**  
->   Cloudflare sunucusu 1551 baytlık verinizi eksiksiz aldığını teyit etti (`1 + 1551 = ack 1552`).
+> * **Soket Eşleşmesi (`192.168.1.177:46814` $\leftrightarrow$ `1.1.1.1:443`):**  
+>   Ubuntu çekirdeği rastgele geçici bir istemci portu (*Ephemeral Port*) tahsis etti: **`46814`**. Hedef ise Cloudflare HTTPS web portu: **`443`**.
+> * **1. Paket (`Flags [S]` - SYN):**  
+>   Ubuntu'nuz Cloudflare'e bağlanmak istediğini bildirdi. Kendi rastgele sıra numarasını belirledi: `seq 3804754110`.
+> * **2. Paket (`Flags [S.]` - SYN-ACK):**  
+>   Cloudflare isteğinizi kabul etti (`S`) ve aldığını onayladı (`.`).  
+>   Dikkat edin: Cloudflare sizin `seq 3804754110` numaranızı $1$ artırarak **`ack 3804754111`** olarak geri gönderdi! Ayrıca kendi başlangıç numarasını bildirdi (`seq 1053142274`).
+> * **3. Paket (`Flags [.]` - ACK):**  
+>   Ubuntu bu yanıtı onayladı (`ACK`). **Böylece 3 Aşamalı El Sıkışma tamamlandı ve güvenli TCP oturumu kuruldu!**
+> * **4. Paket (`length 1440` - TLS Veri Yükü):**  
+>   Bağlantı kurulur kurulmaz Ubuntu `1440` baytlık **TLS Client Hello** (HTTPS şifrelemesini başlatan el sıkışma paketini) Cloudflare'e postaladı!
 
 ---
 
@@ -361,9 +334,9 @@ iptables -L -n -v --line-numbers
 Yerel ağ IP'nizin dış dünyaya genel Public IP ile çıkışını ve router (modem) çevirisini doğrulamak için:
 
 ```bash
-# 1. Yerel Ağdaki IP Adresiniz (eth3 kartınız):
-ip -4 addr show eth3 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'
-# Terminalinizdeki Çıktı: 192.168.1.89
+# 1. Yerel Ağdaki IP Adresiniz (ens33 kartınız):
+ip -4 addr show ens33 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'
+# Çıktı: 192.168.1.177
 
 # 2. Tüm Dünyanın Gördüğü Genel Public IP Adresiniz (NAT Sonrası):
 curl -s https://icanhazip.com
@@ -372,33 +345,51 @@ curl -s https://icanhazip.com
 
 > 🔍 **Canlı NAT / PAT Karşılaştırması:**
 > 
-> * **Bilgisayarınızın Özel IP'si (RFC 1918):** `192.168.1.89`  
+> * **Sanal Makinenizin Özel IP'si (RFC 1918):** `192.168.1.177`  
 >   Bu IP yalnızca evinizin salonundaki modeme kadar geçerlidir. İnternet omurgasında bu adres yönlendirilemez (*non-routable*).
 > * **Modeminizin Dış Genel IP'si (Public IP):** `84.51.13.216`  
 >   İnternet Servis Sağlayıcınızın (Türk Telekom, Superonline vb.) modeminize tahsis ettiği, tüm internette tek ve benzersiz olan genel IP adresinizdir.
 > * **PAT (Port Address Translation) Mucizesi:**  
->   Evinizdeki telefon, televizyon ve bilgisayar aynı anda internete bağlandığında, modem tüm bu cihazların paketlerini tek bir `84.51.13.216` IP'sine ve her cihaz için farklı bir port numarasına (`:43089` gibi) çevirerek dışarı yollar. Cevap geldiğinde de port tablosuna bakarak paketi doğru cihaza geri teslim eder!
+>   Evinizdeki telefon, Windows bilgisayarınız (`192.168.1.89`) ve Ubuntu sanal makineniz (`192.168.1.177`) aynı anda internete bağlansa bile, modem tüm bu cihazların paketlerini tek bir `84.51.13.216` IP'sine ve her cihaz için farklı bir port numarasına (`:46814` gibi) çevirerek dışarı yollar. Cevap geldiğinde de port tablosuna bakarak paketi doğru cihaza geri teslim eder!
 
 ---
 
 ## 12. VLAN (Virtual LAN) Alt Arayüzü Oluşturma ve Test Etme
 
-Linux çekirdeğinde Katman 2 seviyesinde IEEE 802.1Q etiketli sanal alt ağ açmak için:
+### ❓ VLAN Neden Kurulur ve Neden İhtiyaç Vardır?
+
+Fiziksel dünyada her farklı departman veya güvenlik seviyesi için **ayrı ayrı fiziksel switch'ler ve kablolar satın almak** aşırı pahalı ve verimsizdir. VLAN (Sanal Yerel Ağ), tek bir fiziksel kablo ve switch üzerinde mantıksal olarak yalıtılmış bağımsız sanal ağlar kurmamızı sağlar:
+
+1. **🛡️ Güvenlik ve İzolasyon (En Temel Neden):**
+   * Bir şirkette **Muhasebe**, **Yazılım**, **Sunucular** ve **Misafir Wi-Fi (Guest)** aynı fiziksel switch'e bağlıdır.
+   * VLAN olmadan kafeden bağlanan bir misafir, şirket içi sunucuları veya muhasebenin bilgisayarlarını doğrudan dinleyebilir.
+   * VLAN (ör. VLAN 10 Muhasebe, VLAN 50 Misafir) sayesinde bu ağlar Katman 2 seviyesinde birbirinden **tamamen izole edilir**; aralarında bir Router/Firewall kuralı olmadan asla konuşamazlar.
+2. **⚡ Broadcast (Yayın) Fırtınalarını Önleme:**
+   * Bir ağda 1000 cihaz varsa ve birisi ARP anonsu (`Broadcast`) yaparsa, bu anons 1000 cihaza birden gider ve ağı yavaşlatır.
+   * VLAN, büyük bir ağı küçük *Broadcast Domain*'lere böler. Yayınlar sadece o VLAN'daki cihazlarda kalır.
+3. **🖥️ Linux Sunucularda Neden Alt Arayüz (`ens33.10`) Açılır?**
+   * Sunucunuzun kasasında sadece **tek bir fiziksel Ethernet kablosu** takılı olabilir.
+   * Ancak bu sunucunun hem **Web trafiğine (VLAN 10)** hem de **Veritabanı yedekleme ağına (VLAN 20)** aynı anda hizmet vermesi gerekebilir.
+   * İşte Linux çekirdeğindeki `ens33.10` ve `ens33.20` gibi sanal alt arayüzler (*Sub-interfaces*), switch'ten gelen 802.1Q etiketli paketleri ayıklar ve tek bir kablo üzerinden sunucuyu birden fazla ağın üyesi yapar!
+
+---
+
+### 🧪 Linux Üzerinde Canlı VLAN Testi:
 
 ```bash
-# 1. eth3 arayüzüne bağlı VLAN 10 alt arayüzü oluştur:
-sudo ip link add link eth3 name eth3.10 type vlan id 10
+# 1. ens33 kartınıza bağlı VLAN 10 alt arayüzü oluştur:
+ip link add link ens33 name ens33.10 type vlan id 10
 
 # 2. Sanal VLAN arayüzüne IP ata ve ayağa kaldır:
-sudo ip addr add 10.10.10.5/24 dev eth3.10
-sudo ip link set dev eth3.10 up
+ip addr add 10.10.10.5/24 dev ens33.10
+ip link set dev ens33.10 up
 
-# 3. VLAN etiketleme detayını doğrula:
-ip -d link show eth3.10
+# 3. VLAN etiketleme detayını (802.1Q) doğrula:
+ip -d link show ens33.10
 # Çıktı: vlan protocol 802.1Q id 10 ...
 
 # 4. Test bittikten sonra sanal VLAN arayüzünü sil:
-sudo ip link del eth3.10
+ip link del ens33.10
 ```
 
 ---
@@ -409,11 +400,10 @@ Bir VPN tüneli üzerinden güvenli yönlendirilmeyi doğrulamak için:
 
 ```bash
 # WireGuard tüneli varsa:
-sudo wg show
+wg show 2>/dev/null || echo "Aktif WireGuard tüneli yok."
 
 # Belirli bir şirket içi IP'ye giderken hangi arayüzün (tünelin) seçildiğini test et:
-ip route get 10.50.1.1
-# Örnek Çıktı: 10.50.1.1 dev wg0 src 10.50.1.5 uid 1000 (Tünel devrededir!)
+ip route get 10.50.1.1 2>/dev/null || echo "Özel rota tanımlı değil."
 ```
 
 ---
@@ -423,14 +413,12 @@ ip route get 10.50.1.1
 İstemci adına vekillik yapan Forward Proxy veya sunucu önündeki Nginx Reverse Proxy'yi test etmek için:
 
 ```bash
-# 1. Forward Proxy üzerinden web isteği atma testi:
-curl -x http://127.0.0.1:8080 -I https://google.com
+# 1. Forward Proxy üzerinden web isteği atma testi (örnek port 8080):
+curl -x http://127.0.0.1:8080 -I https://google.com 2>/dev/null || echo "Aktif Proxy dinleyicisi yok."
 
 # 2. Reverse Proxy (Nginx) arkasındaki sunucu başlıklarını inceleme:
-curl -I http://localhost
+curl -I http://localhost 2>/dev/null || echo "Yerel web sunucu çalışmıyor."
 ```
-
-> 🔍 **Neye Bakıyoruz?** Yanıt başlıklarında `Server: nginx`, `X-Forwarded-For` ve `X-Real-IP` başlıklarının yer alması, isteğin vekil sunucu tarafından karşılandığını doğrular.
 
 ---
 
@@ -444,26 +432,27 @@ cat << 'EOF' > test_network_lifecycle.sh
 set -e
 
 echo "=========================================================="
-echo "🌐 LİNUX AĞ YAŞAM DÖNGÜSÜ KONTROL RAPORU"
+echo "🌐 LİNUX AĞ YAŞAM DÖNGÜSÜ KONTROL RAPORU (VMware Ubuntu)"
 echo "=========================================================="
 
-echo -e "\n[01. Fiziksel MAC Adresi (eth3)]"
-ip link show eth3 | grep -E "link/ether"
+echo -e "\n[01. Fiziksel MAC Adresi (ens33)]"
+ip link show ens33 | grep -E "link/ether"
 
-echo -e "\n[02. DNS Yapılandırması]"
+echo -e "\n[02. DHCP Kira Kaydı & DNS]"
+cat /run/systemd/netif/leases/* 2>/dev/null | grep -E "ADDRESS" || true
 grep nameserver /etc/resolv.conf
 
 echo -e "\n[03. Yerel IP Adresi (IPv4 / IPv6)]"
-ip -br addr show eth3
+ip -br addr show ens33
 
 echo -e "\n[04. Subnet Mask & Broadcast]"
-ip -4 addr show eth3 | grep -E "inet "
+ip -4 addr show ens33 | grep -E "inet "
 
 echo -e "\n[05. Varsayılan Ağ Geçidi (Default Gateway)]"
 ip route show default
 
 echo -e "\n[06. ARP Tablosu (Modem MAC Adresi)]"
-ip neigh show dev eth3 | head -n 3
+ip neigh show dev ens33 | head -n 3
 
 echo -e "\n[07. DNS Çözümleme Testi (google.com)]"
 dig google.com +short | head -n 2
