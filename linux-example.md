@@ -239,14 +239,41 @@ Sisteminizde hangi servislerin hangi portlarda beklediğini ve anlık soketleri 
 # Dinlenen tüm TCP ve UDP portlarını numaraları ve süreç isimleriyle gör:
 ss -tulpn
 
-# Anlık kurulmuş aktif bağlantı soketlerini (IP:Port -> IP:Port) listele:
+# Terminalinizdeki Gerçek Çıktı:
+# Netid  State   Recv-Q  Send-Q  Local Address:Port      Peer Address:Port  Process
+# udp    UNCONN  0       0       127.0.0.54:53           0.0.0.0:*          users:(("systemd-resolve",pid=85,fd=18))
+# udp    UNCONN  0       0       127.0.0.53%lo:53        0.0.0.0:*          users:(("systemd-resolve",pid=85,fd=16))
+# udp    UNCONN  0       0       10.255.255.254:53       0.0.0.0:*
+# udp    UNCONN  0       0       127.0.0.1:323           0.0.0.0:*          users:(("chronyd",pid=171,fd=4))
+# tcp    LISTEN  0       1000    10.255.255.254:53       0.0.0.0:*
+# tcp    LISTEN  0       4096    127.0.0.53%lo:53        0.0.0.0:*          users:(("systemd-resolve",pid=85,fd=17))
+# tcp    LISTEN  0       4096    127.0.0.54:53           0.0.0.0:*          users:(("systemd-resolve",pid=85,fd=19))
+
+# Anlık kurulmuş aktif bağlantı oturumlarını (IP:Port -> IP:Port) listele:
 ss -tan state established
+# Çıktı: Boş döndü (Başlıklar listelendi)
 ```
 
-> 🔍 **Örnek Çıktı:**
-> `ESTAB 0 0 192.168.1.50:52110 -> 142.250.184.206:443`
-> İstemci soketi: `192.168.1.50:52110` (Geçici Ephemeral Port)  
-> Hedef sunucu soketi: `142.250.184.206:443` (Google HTTPS)
+> 🔍 **Açık Portların ve Servislerin Analizi:**
+> 1. **Port 53 (DNS Çözümleyici - `systemd-resolve`):**  
+>    * Hem **UDP** (`UNCONN`) hem de **TCP** (`LISTEN`) modunda dinliyor.  
+>    * Sisteminizin internete gitmeden önce yerel DNS isteklerini karşılayan yerel önbellek servisidir.
+> 2. **Port 323 (NTP Zaman Senkronizasyonu - `chronyd`):**  
+>    * Bilgisayarınızın saatini dünya atom saatleriyle senkronize tutan Network Time Protocol (NTP) istemcisidir.
+> 3. **`state established` Neden Boş Döndü?**  
+>    * Web sayfaları (HTTP/HTTPS) veriyi milisaniyeler içinde alıp soketi kapatır (`TIME_WAIT` veya kapalı duruma geçer).  
+>    * Komutu çalıştırdığınız an arka planda canlı dosya indiren veya aktif açık kalan bir SSH/VPN tüneli olmadığı için tablo boştur.
+> 
+> 💡 **Canlı Bir "ESTABLISHED" Soketi Görme Testi:**
+> ```bash
+> # Arka planda geçici bir web sunucusu başlatın ve soket oluşturun:
+> python3 -m http.server 8080 &
+> curl http://localhost:8080/ >/dev/null &
+> 
+> # Anında soketleri sorgulayın:
+> ss -tan state established
+> # Çıktı: ESTAB 0 0 127.0.0.1:54322 -> 127.0.0.1:8080
+> ```
 
 ---
 
@@ -254,22 +281,31 @@ ss -tan state established
 
 Web bağlantısı kurulurken gerçekleşen `SYN -> SYN-ACK -> ACK` paketlerini terminalde canlı yakalamak için:
 
-1. **Terminal 1'de Dinlemeyi Başlatın:**
 ```bash
-sudo tcpdump -nn -i any "tcp[tcpflags] & (tcp-syn|tcp-ack) != 0 and host 1.1.1.1" -c 4
+# Tek bir terminalde arka planda dinleyip hemen curl isteği atma:
+tcpdump -nn -i any "tcp[tcpflags] & (tcp-syn|tcp-ack) != 0 and host 1.1.1.1" -c 4 &
+curl -I -s https://1.1.1.1 >/dev/null
 ```
 
-2. **Terminal 2'de Bağlantı İsteği Atın:**
-```bash
-curl -I https://1.1.1.1
-```
-
-3. **Terminal 1 Çıktısını İnceleyin:**
-```text
-1. 192.168.1.50.54321 > 1.1.1.1.443: Flags [S], seq 1000 ...        (SYN: Bağlanmak istiyorum)
-2. 1.1.1.1.443 > 192.168.1.50.54321: Flags [S.], seq 2000, ack 1001 (SYN-ACK: Kabul, ben de hazırım)
-3. 192.168.1.50.54321 > 1.1.1.1.443: Flags [.], ack 2001            (ACK: Anlaştık, başla)
-```
+> 🔍 **Terminalinizde Yakalanan Canlı TCP Paketlerinin Analizi:**
+> ```text
+> 1. In  IP 1.1.1.1.443 > 192.168.1.89.43089: Flags [S.], seq 1510900119, ack 4246799660 ...
+> 2. Out IP 192.168.1.89.43089 > 1.1.1.1.443: Flags [.],  ack 1, win 502 ...
+> 3. Out IP 192.168.1.89.43089 > 1.1.1.1.443: Flags [P.], seq 1:1552, ack 1, length 1551 ...
+> 4. In  IP 1.1.1.1.443 > 192.168.1.89.43089: Flags [.],  ack 1552, win 16 ...
+> ```
+> 
+> 🧠 **Satır Satır Ağ Mühendisliği İncelemesi:**
+> * **Soket Eşleşmesi (`192.168.1.89:43089` $\leftrightarrow$ `1.1.1.1:443`):**  
+>   Bilgisayarınız işletim sistemi havuzundan geçici rastgele bir istemci portu (*Ephemeral Port*) seçti: **`43089`**. Hedef ise Cloudflare'in standart HTTPS web portu: **`443`**.
+> * **1. Paket (`Flags [S.]` - SYN-ACK):**  
+>   Cloudflare sunucusu isteğinizi kabul etti (`S` = SYN) ve aldığını onayladı (`.` = ACK). Sunucu kendi rastgele sıra numarasını belirledi (`seq 1510900119`) ve sizin sıra numaranızı onayladı (`ack 4246799660`).
+> * **2. Paket (`Flags [.]` - ACK):**  
+>   Bilgisayarınız sunucunun yanıtını onayladı (`ACK`). **Böylece 3-Way Handshake başarıyla tamamlandı ve TCP oturumu kuruldu!**
+> * **3. Paket (`Flags [P.]` - PUSH + ACK, Length 1551):**  
+>   El sıkışma biter bitmez bilgisayarınız `length 1551` baytlık ilk gerçek şifreli veriyi (**TLS Client Hello** - HTTPS şifreleme başlatma paketi) yolladı ve hemen iletilmesi için `PUSH` bayrağını dikti!
+> * **4. Paket (`Flags [.]` - ACK, ack 1552):**  
+>   Cloudflare sunucusu 1551 baytlık verinizi eksiksiz aldığını teyit etti (`1 + 1551 = ack 1552`).
 
 ---
 
@@ -294,17 +330,18 @@ sudo conntrack -L -p tcp --dport 443 2>/dev/null || cat /proc/net/nf_conntrack |
 Yerel ağ IP'nizin dış dünyaya Public IP ile çıkışını ve router kurallarını test etmek için:
 
 ```bash
-# 1. Yerel IP'niz:
-ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'
+# 1. Yerel IP'niz (eth3 kartınız):
+ip -4 addr show eth3 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'
+# Çıktı: 192.168.1.89
 
-# 2. İnternette görünen genel Public IP'niz (NAT sonrası):
+# 2. İnternette görünen genel Public IP'niz (NAT sonrası modemin dış IP'si):
 curl -s https://icanhazip.com
 
 # 3. Eğer Linux makineniz bir router ise NAT (Masquerade) kurallarını listele:
 sudo iptables -t nat -L -n -v
 ```
 
-> 🔍 **Yorum:** İki IP birbirinden farklıdır. Modemin arkasındaki `192.168.1.50` yerel IP'niz, internet servis sağlayıcının verdiği `88.240.x.x` genel IP'sine çevrilmiştir (*PAT - Port Address Translation*).
+> 🔍 **Yorum:** İki IP birbirinden tamamen farklıdır! Modemin arkasındaki `192.168.1.89` yerel IP'niz, internet servis sağlayıcının (ISP) modeminize tahsis ettiği genel IP'ye dönüştürülmüştür (*PAT / NAPT - Port Address Translation*). Evdeki 10 farklı cihaz internete çıksa bile dış dünya hepsini aynı genel IP olarak görür.
 
 ---
 
