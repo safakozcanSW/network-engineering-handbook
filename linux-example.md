@@ -34,33 +34,45 @@ Ağ kartınızın fiziksel donanım kimliğini görmek ve geçici olarak değiş
 # 1. Mevcut ağ kartlarını ve MAC adreslerini listele
 ip link show
 
-# Örnek Çıktı:
+# Terminalinizdeki Gerçek Çıktı (Mirrored Ağ Modu):
 # 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
 #    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
-# 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000
-#    link/ether 00:15:5d:2e:6a:8c brd ff:ff:ff:ff:ff:ff
-#    altname enx00155d2e6a8c
+# 2: eth0: <BROADCAST,MULTICAST> mtu 1500 qdisc mq state DOWN mode DEFAULT group default qlen 1000
+#    link/ether 00:15:5d:eb:99:b8 brd ff:ff:ff:ff:ff:ff
+# 3: eth1: <BROADCAST,MULTICAST> mtu 1500 qdisc mq state DOWN mode DEFAULT group default qlen 1000
+#    link/ether 90:82:c3:3e:74:45 brd ff:ff:ff:ff:ff:ff
+# 4: eth2: <BROADCAST,MULTICAST> mtu 1500 qdisc mq state DOWN mode DEFAULT group default qlen 1000
+#    link/ether 00:ff:36:f4:d5:44 brd ff:ff:ff:ff:ff:ff
+# 5: loopback0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000
+#    link/ether 00:15:5d:7b:60:3f brd ff:ff:ff:ff:ff:ff
+# 6: eth3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000
+#    link/ether 50:2e:91:64:40:5e brd ff:ff:ff:ff:ff:ff
+#    altname enx502e9164405e
 ```
 
-> 🔍 **Çıktının Detaylı Analizi (Neden 2 Tane Var?):**
-> * **`1: lo` (Loopback - Yerel İç Döngü):**
->   * Fiziksel bir donanım kartı veya kablo **DEĞİLDİR**.
->   * İşletim sisteminin kendi kendine konuşmasını sağlayan sanal bir iç döngüdür (`localhost` / `127.0.0.1`).
->   * Kendi bilgisayarınızda bir veritabanı veya web sunucusu çalıştırdığınızda paketler dışarı modeme veya kabloya çıkmaz, doğrudan `lo` üzerinden sistemin içine döner.
+> 🔍 **Çıktının Detaylı Analizi (Tüm Arayüzlerin Görevleri):**
+> * **`1: lo` (Standart Linux Loopback):**
+>   * Linux çekirdeğinin kendi içindeki servislerle konuşmasını sağlayan klasik sanal döngüdür (`localhost` / `127.0.0.1`).
 >   * Donanımsal bir kart olmadığı için MAC adresi boştur: `link/loopback 00:00:00:00:00:00`.
-> * **`2: eth0` (Ethernet - Dış Dünyaya Bakan Gerçek Ağ Kartınız / NIC):**
->   * Bilgisayarınızı modeme, yerel ağa ve internete bağlayan **asıl arayüz kartıdır**.
->   * `link/ether 00:15:5d:2e:6a:8c` $\rightarrow$ Ağ kartınızın 48-bitlik fiziksel **MAC adresidir** (İlk 3 oktet olan `00:15:5d` Microsoft Hyper-V/WSL2 üretici kodudur).
->   * `brd ff:ff:ff:ff:ff:ff` $\rightarrow$ Yerel ağdaki Katman 2 Ethernet genel yayın (*Broadcast*) adresidir.
+> * **`5: loopback0` (Windows $\leftrightarrow$ Linux Aynalama Köprüsü):**
+>   * `networkingMode=mirrored` ile gelen özel sanal bağdaştırıcıdır.
+>   * Microsoft sanal donanım kodu taşır (`link/ether 00:15:5d:7b:60:3f`).
+>   * **Görevi:** Windows tarafındaki `localhost` ile Linux tarafındaki `localhost` portlarını birbirine bağlamaktır. Windows'ta veya Linux'ta açılan bir web sunucusuna her iki taraftan da erişilmesini sağlar.
+> * **`2: eth0`, `3: eth1`, `4: eth2` (`state DOWN`):**
+>   * Windows bilgisayarınızdaki kablo takılı olmayan Ethernet portları, Bluetooth ağ bağdaştırıcısı veya sanal VPN arayüzleridir. Aktif bağlantı olmadığı için durumları `DOWN` gözükür.
+> * **`6: eth3` (`state UP` - Asıl Fiziksel Ağ Kartınız / NIC):**
+>   * Bilgisayarınızı modeme ve internete bağlayan **ana aktif karttır**.
+>   * `link/ether 50:2e:91:64:40:5e` $\rightarrow$ Bilgisayarınızın Wi-Fi veya Ethernet donanımının **gerçek fabrika çıkışlı 48-bit fiziksel MAC adresidir**!
+>   * `brd ff:ff:ff:ff:ff:ff` $\rightarrow$ Katman 2 Ethernet genel yayın (*Broadcast*) adresidir.
 
 ```bash
 # 2. Geçici MAC Adresi Değiştirme (MAC Spoofing Testi):
-sudo ip link set dev eth0 down
-sudo ip link set dev eth0 address 00:11:22:33:44:55
-sudo ip link set dev eth0 up
+sudo ip link set dev eth3 down
+sudo ip link set dev eth3 address 00:11:22:33:44:55
+sudo ip link set dev eth3 up
 
 # Tekrar doğrula:
-ip link show eth0
+ip link show eth3
 ```
 
 ---
